@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="A personal election night watchlist with official reported results and clear source status.">
+  <title>Election Night · November 3, 2026</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#races">Skip to races</a>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Election Night home"><span class="brand-mark" aria-hidden="true">▥</span> ELECTION NIGHT</a>
+      <div class="topbar-right"><span id="local-clock" class="clock"></span><button id="refresh" class="button refresh-button" type="button"><span aria-hidden="true">↻</span> Refresh</button></div>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div><p class="eyebrow">NOVEMBER 3, 2026 · U.S. MIDTERMS</p><h1 id="page-title">The balance of power.</h1><p class="intro-copy">House. Senate. The races that shape the night.</p></div>
+        <div class="connection"><span id="connection-status" class="status status-loading">◌ Connecting</span><span id="refresh-note">Checking for results…</span></div>
+      </section>
+      <div id="alert" class="alert" role="status" hidden></div>
+      <section class="chamber-section" aria-label="National House and Senate control"><div id="chambers" class="chambers"><div class="chamber-card"><span class="eyebrow">NATIONAL CONTROL</span><h2>House & Senate</h2><p class="muted">Checking national reporting sources…</p></div></div></section>
+      <section class="national-strip" aria-label="National coverage"><div><span class="eyebrow">THE NATIONAL PICTURE</span><p>Full-country results and race calls</p></div><div id="national-links" class="national-links"></div></section>
+      <section class="flip-section" aria-labelledby="flip-title"><div class="flip-heading"><div><span class="eyebrow">CHANGING HANDS</span><h2 id="flip-title">Flipped seats & governorships</h2></div><span id="flip-count" class="small-label">AP RACE CALLS</span></div><p class="muted">Called races where the winning party differs from the previous holder; party changes may differ from caucus changes.</p><div id="flips" class="flip-list"><p class="muted">Checking for called flips…</p></div></section>
+      <section id="metrics" class="metrics" aria-label="Coverage summary">
+        <div class="metric"><span class="metric-label">Races monitored</span><strong id="metric-races">—</strong><span class="metric-note">Across connected feeds</span></div>
+        <div class="metric"><span class="metric-label">Reporting votes</span><strong id="metric-reporting">—</strong><span class="metric-note">Within this dashboard</span></div>
+        <div class="metric"><span class="metric-label">States covered</span><strong id="metric-states">—</strong><span class="metric-note" id="metric-state-list">Checking coverage</span></div>
+        <div class="metric"><span class="metric-label">Sources current</span><strong id="metric-sources">—</strong><span class="metric-note">Successful recent checks</span></div>
+      </section>
+      <div class="workspace">
+        <section id="races" class="race-section" aria-labelledby="race-title">
+          <div class="section-heading"><div><h2 id="race-title">Race desk</h2><p id="results-count" role="status">Loading official feeds…</p></div><div class="view-switch" role="group" aria-label="Race view"><button class="active" id="view-all" type="button" aria-pressed="true">All races</button><button id="view-key" type="button" aria-pressed="false">Key races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
+          <div class="filters"><label class="search-label"><span class="sr-only">Search races or candidates</span><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="Find a race or candidate" autocomplete="off"></label><label><span class="sr-only">Filter by state</span><select id="state-filter"><option value="">All states</option></select></label><label><span class="sr-only">Filter by office</span><select id="office-filter"><option value="">All offices</option><option>Senate</option><option>House</option><option>Governor</option><option>Other</option></select></label></div>
+          <div class="coverage-row"><p class="coverage-note">Coverage varies by source · Vote totals unofficial · AP calls labeled separately</p><button type="button" id="arkansas-focus" class="state-chip">Arkansas focus</button></div>
+          <div id="race-grid" class="race-grid"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">◌</span><h3>Opening the results desk</h3><p>Checking official feeds for today’s election.</p></div></div>
+        </section>
+        <aside class="sidebar" aria-label="Timing and sources">
+          <section class="side-panel"><div class="panel-heading"><h2>Tonight’s timing</h2><span class="small-label" id="timezone-label">Local time</span></div><div id="poll-closings"><p class="muted">Loading scheduled poll closings…</p></div><p class="panel-footnote">Closing time is not a results deadline. Extensions and counting schedules can delay returns.</p></section>
+          <section class="side-panel"><div class="panel-heading"><h2>Source check</h2><span class="small-label">FEED HEALTH</span></div><div id="source-list"><p class="muted">Connecting to sources…</p></div></section>
+          <section class="reading-note"><span class="note-symbol" aria-hidden="true">i</span><div><h3>Read the count carefully</h3><p>Early returns can favor different candidates as counties and ballot types report. Precincts reporting do not equal the share of all votes counted.</p></div></section>
+        </aside>
+      </div>
+    </main>
+    <footer><span>Election Night / Personal results desk</span><span>AP race calls · Official reported votes · No local forecasts</span></footer>
+  </div>
+</body>
+</html>
