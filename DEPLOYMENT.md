@@ -30,6 +30,8 @@ This project's production address is `https://election-night-959.pages.dev`. Wra
 
 Add `election.blaketownsend.com` under the Pages project's Custom domains. Then add the exact CNAME target Cloudflare supplies at the domain's DNS provider. For a subdomain, Cloudflare Pages does not require moving the whole domain's nameservers. Do not create the DNS record before associating the domain with Pages. Verify both DNS and HTTPS after activation.
 
+The custom domain is registered with Pages. Its DNS record is `election CNAME election-night-959.pages.dev`, DNS only, in the `blaketownsend.com` Cloudflare zone. The domain owner moved the nameservers from Squarespace to Cloudflare during setup.
+
 ## Sources
 
 - [watch.vote publisher terms](https://watch.vote/docs/embeds/for-publishers) permit editorial/civic embeds with attribution intact.

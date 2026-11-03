@@ -1,5 +1,7 @@
 # Election Night
 
+[Open the public dashboard](https://election.blaketownsend.com/) · [Start with Arkansas](https://election.blaketownsend.com/?state=AR)
+
 Election-night dashboard for November 3, 2026. Run locally at **http://127.0.0.1:8767** with Python 3.9 or newer.
 
 The public Cloudflare edition is in `public/`: adjustable home state, a saved watchlist and permitted race embeds, with NPR/AP links for national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.

@@ -50,3 +50,9 @@ The review's two additional coverage suggestions were also addressed: fixtures n
 - The simplify pass removed three redundant comments. The provider's reduced-motion/data refresh exception is stated on the page.
 - `ce-code-review mode:agent base:c442de6` completed with zero findings across seven review lenses. Receipt: `/tmp/compound-engineering-501/ce-code-review/20261103-174344-c7413e26/review.json`. The bounded text/label fixes and failure/retry checks were included in the review.
 - The personal service restarted with the home-state source-link metadata; all nine sources report healthy and 508 races are served at 5:49 p.m. Central. Earlier pre-close observations above remain point-in-time records.
+
+## Public release
+
+Commit `c646b02` was published to `UnsaltedHash42/election-night` on `feat/election-night`. Cloudflare Pages deployment `c980f44f` serves `https://election-night-959.pages.dev/`. The home page, JavaScript and 507-row directory return HTTP 200 with the configured CSP; `/data/feed-npr.json` and `/api/results` return 404. Safari loads the hosted Arkansas Senate, governor and House race embeds with provider attribution. The preview server was stopped; the personal service remains running as process 62804.
+
+At 5:55 p.m. Central, `https://election.blaketownsend.com/` passed HTTPS verification. Its HTML, JavaScript, stylesheet, race directory and 404 page match the release bytes; the private cache and local API paths return 404. The GitHub repository's website link points to the custom domain.
