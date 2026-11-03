@@ -1,11 +1,13 @@
 # Election Night
 
-Personal dashboard for November 3, 2026, at **http://127.0.0.1:8767**.
+Election-night dashboard for November 3, 2026. Run locally at **http://127.0.0.1:8767** with Python 3.9 or newer.
+
+The public Cloudflare edition is in `public/`: adjustable home state, a saved watchlist and permitted race embeds, with NPR/AP links for national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.
 
 Start or reopen the service:
 
 ```sh
-cd /Users/ddrt/dev/election-night
+cd election-night
 python3 start.py
 ```
 
@@ -15,13 +17,15 @@ Open the address in Safari or another browser. The service runs in the backgroun
 
 - House and Senate control: AP calls via NPR, with 65 Senate seats not up tonight included; the Democratic caucus includes two independent holdovers. An independent winner with no stated caucus stays in Other.
 - Flipped seats and governorships: only called races where the winner's party differs from the previous holder. This tracks party changes, which may differ from caucus changes.
-- Key races and all 36 governor elections; Arkansas focus and a saved personal watchlist.
+- Key races and all 36 governor elections; a saved home state and personal watchlist.
 - Sherwood mayor and the two contested city council races, from Arkansas's official feed.
 - Source check times, source update times, and last good data retained through failures.
 
 The page checks the local service every 30 seconds. NPR and most official feeds are fetched every two minutes; NC/VA every minute. The supplemental Open America feed is checked every ten minutes while empty, and every minute while counting. Refresh reloads the latest cached data without bypassing upstream cache intervals. If one NPR office feed fails, the other offices keep updating; the failed office retains its previous results with a warning.
 
 ## Sources and limits
+
+The current AP/NPR adapter is for personal use. Publishing this code does not grant rights to redistribute its source data: [NPR's terms](https://www.npr.org/about-npr/179876898/terms-of-use) restrict scraping to republish, and [AP's terms](https://www.ap.org/terms-and-conditions/) reserve distribution rights. A public hosted version needs licensed national data or a permitted embed. The ignored `data/` directory must stay out of published source and deployment artifacts.
 
 - [AP via NPR](https://apps.npr.org/2026-election-results/) supplies national votes and calls. Its public website JSON is not a contracted API. The current feed contains 433 of 435 House races (TX-18 and WI-08 were absent when checked), all 35 Senate races and all 36 governor races. Missing House feeds remain uncalled; the source may add them later.
 - [Arkansas official results](https://arkansas.tally-enr.com/) supplies Sherwood results. [Pulaski County](https://votepulaskiar.gov/election-results/) and [DDHQ local results](https://votes.decisiondeskhq.com/elections/2026-11-03/arkansas/pulaski) cover additional local races.

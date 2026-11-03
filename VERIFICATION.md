@@ -40,3 +40,13 @@ At 4:00 p.m. Central, `python3 start.py` launched detached process 91140 on `127
 `ce-code-review mode:agent base:433f3b5 plan:CONTRACT.md` completed with status `complete`, run `20261103-155410-fa5fdbfe`. Receipt: `/tmp/compound-engineering-501/ce-code-review/20261103-155410-fa5fdbfe/review.json`. Nine review lenses returned three confirmed P2 findings. Root applied findings 1–3 inline and verified each as described above; no justified finding remains unresolved. The receipt covers the saved pre-fix snapshot, and the checks here cover the subsequent fixes.
 
 The review's two additional coverage suggestions were also addressed: fixtures now check NPR calls/flips surviving overlapping direct/aggregated counts, missing House races remaining uncalled, unavailable national totals remaining null, and independent Senate winners with either caucus or an unknown caucus. The public-feed stability and pre-close validation limits remain documented above.
+
+## Public edition and adjustable home state
+
+- `python3 -m unittest test_feeds.py test_public.py`: 17 tests pass. Both JavaScript files pass `node --check`.
+- Focused DOM checks cover home-state defaults, saved choices, query overrides, filter clearing, pins, pagination, six-frame limits, stable frame reuse, and resize origin/source/height validation. Network failures and invalid directory responses retain prior cards; initial invalid JSON shows an error; Retry restores the directory.
+- Safari with the actual Pages preview headers: home-state selection persists after reopening, home focus clears filters, pinning and watchlist filtering work, and watch.vote cards render with source attribution. Layout checked at desktop and 574px width; a phone viewport remains untested.
+- The public directory contains 507 seat records with no votes, candidates or calls. Only `public/` is deployed. The private cache URL returns 404. National control and party changes link to NPR/AP.
+- The simplify pass removed three redundant comments. The provider's reduced-motion/data refresh exception is stated on the page.
+- `ce-code-review mode:agent base:c442de6` completed with zero findings across seven review lenses. Receipt: `/tmp/compound-engineering-501/ce-code-review/20261103-174344-c7413e26/review.json`. The bounded text/label fixes and failure/retry checks were included in the review.
+- The personal service restarted with the home-state source-link metadata; all nine sources report healthy and 508 races are served at 5:49 p.m. Central. Earlier pre-close observations above remain point-in-time records.

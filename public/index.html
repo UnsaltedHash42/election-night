@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Follow national election coverage and build a personal watchlist of 2026 races with source-attributed results.">
+  <title>Election Night · November 3, 2026</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#race-desk">Skip to races</a>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Election Night home"><span aria-hidden="true">▥</span> ELECTION NIGHT</a>
+      <span class="edition">NOVEMBER 3, 2026</span>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">U.S. MIDTERMS</p>
+        <h1 id="page-title">Follow election night.</h1>
+        <p class="intro-copy">National control, key races, and results close to home.</p>
+      </section>
+      <section class="national-section" aria-labelledby="national-title">
+        <div class="section-heading"><div><h2 id="national-title">The national picture</h2><p>Full national tallies and called party changes are on NPR and AP.</p></div></div>
+        <div class="national-grid">
+          <article class="national-card"><span class="eyebrow">HOUSE & SENATE</span><h3>Who will control Congress?</h3><p>Follow the national seat count and race calls.</p><a class="source-button" href="https://apps.npr.org/2026-election-results/" target="_blank" rel="noopener noreferrer">Open NPR national results <span aria-hidden="true">↗</span></a></article>
+          <article class="national-card"><span class="eyebrow amber">SEATS & GOVERNORSHIPS</span><h3>Which races change hands?</h3><p>Follow AP’s national coverage for called winners and party changes.</p><a class="source-button" href="https://apnews.com/projects/elections-2026/" target="_blank" rel="noopener noreferrer">Open AP election results <span aria-hidden="true">↗</span></a></article>
+        </div>
+        <p class="national-note">This page embeds individual race results; it does not calculate national control or a national flip tally. <a href="https://votes.decisiondeskhq.com/" target="_blank" rel="noopener noreferrer">Decision Desk HQ coverage ↗</a></p>
+      </section>
+      <section class="location-settings" aria-label="Your location">
+        <div class="location-controls"><label for="home-state">Home state</label><select id="home-state" aria-describedby="location-note"><option value="">National overview</option></select><button id="home-focus" class="button" type="button" hidden>Show home state</button></div>
+        <p id="location-note">Choose a state to include its races in Key races. Your choice stays in this browser.</p>
+      </section>
+      <section id="local-links" class="local-links" aria-labelledby="local-title" hidden>
+        <h2 id="local-title">Arkansas & Sherwood</h2><p>City coverage here links to Sherwood and Pulaski County results.</p>
+        <div class="link-row"><a href="https://arkansas.tally-enr.com/" target="_blank" rel="noopener noreferrer">Arkansas official results ↗</a><a href="https://votes.decisiondeskhq.com/elections/2026-11-03/arkansas/pulaski" target="_blank" rel="noopener noreferrer">Sherwood / Pulaski races ↗</a><a href="https://votepulaskiar.gov/election-results/" target="_blank" rel="noopener noreferrer">Pulaski County official results ↗</a></div>
+      </section>
+      <section id="race-desk" class="race-section" aria-labelledby="race-title">
+        <div class="section-heading"><div><h2 id="race-title">Your race desk</h2><p id="results-count" role="status">Loading the race directory…</p></div><div class="view-switch" role="group" aria-label="Race view"><button id="view-key" class="active" type="button" aria-pressed="true">Key races</button><button id="view-all" type="button" aria-pressed="false">All races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
+        <div class="filters"><label class="search-label"><span class="sr-only">Search race names or states</span><input id="search" type="search" placeholder="Find a race or state" autocomplete="off"></label><label><span class="sr-only">Filter by state</span><select id="state-filter"><option value="">All states</option></select></label><label><span class="sr-only">Filter by office</span><select id="office-filter"><option value="">All offices</option><option>Senate</option><option>House</option><option>Governor</option><option>Delegate</option></select></label></div>
+        <p class="coverage-note">Counts, call status, source and update time appear inside each watch.vote card. Cards update through the provider when results are available; a reported lead is not a call. Reload for fresh counts if reduced motion or reduced data is enabled.</p>
+        <div id="directory-error" class="alert" role="alert" hidden><p>The race directory could not be loaded. National coverage links remain available above.</p><button id="retry" class="button" type="button">Try again</button></div>
+        <div id="race-grid" class="race-grid"><p class="empty-state">Opening the race directory…</p></div>
+        <nav id="pagination" class="pagination" aria-label="Race pages" hidden><button id="page-prev" class="button" type="button" aria-controls="race-grid">← Previous</button><span id="page-label" aria-live="polite"></span><button id="page-next" class="button" type="button" aria-controls="race-grid">Next →</button></nav>
+      </section>
+      <section class="reading-note" aria-labelledby="reading-title"><span aria-hidden="true">ⓘ</span><div><h2 id="reading-title">Read the count carefully</h2><p>Early returns can shift as counties and ballot types report. Precincts reporting do not equal the share of votes counted. Each embedded card labels its source and whether results are unofficial; a call is distinct from certification.</p><p>If a card is blank or blocked, use its “Open race at watch.vote” link. Source attribution remains inside every card.</p></div></section>
+      <noscript><p class="alert">JavaScript is needed for the race picker. Use the NPR, AP and official results links above for election coverage.</p></noscript>
+    </main>
+    <footer><span>Election Night · Independent results desk</span><span>Individual counts and calls: <a href="https://watch.vote/" target="_blank" rel="noopener noreferrer">watch.vote</a> and the sources named in each card · <a href="https://watch.vote/docs/embeds/for-publishers" target="_blank" rel="noopener noreferrer">Embed information</a></span></footer>
+  </div>
+</body>
+</html>

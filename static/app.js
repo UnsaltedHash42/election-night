@@ -3,6 +3,26 @@
 const $ = (id) => document.getElementById(id);
 const number = new Intl.NumberFormat('en-US');
 const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+const stateNames = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
+  DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois',
+  IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts',
+  MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada',
+  NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota',
+  OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota',
+  TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia',
+  WI: 'Wisconsin', WY: 'Wyoming'
+};
+let homeState = '';
+try {
+  const saved = localStorage.getItem('election-night-home-state');
+  if (Object.hasOwn(stateNames, saved)) homeState = saved;
+} catch {}
+const queryState = new URLSearchParams(window.location.search).get('state')?.toUpperCase();
+if (queryState !== undefined && (queryState === '' || Object.hasOwn(stateNames, queryState))) {
+  homeState = queryState;
+  try { localStorage.setItem('election-night-home-state', homeState); } catch { /* Storage may be disabled. */ }
+}
 let data = null;
 let apiFailed = false;
 let fetching = false;
@@ -184,8 +204,28 @@ function emptyState(title, description, clear = false) {
   return box;
 }
 
+function renderLocation() {
+  $('home-state').value = homeState;
+  $('home-focus').hidden = !homeState;
+  $('home-focus').textContent = homeState ? `Show ${stateNames[homeState]} races` : 'Show home state';
+  $('location-note').textContent = homeState
+    ? `Key races include ${stateNames[homeState]}. Saved in this browser.${homeState === 'AR' ? ' City coverage includes Sherwood mayor and council races.' : ' City and county races are not covered here.'}`
+    : 'Choose a home state to add its races to Key races. National control and flips stay visible.';
+}
+
+function renderNationalLinks() {
+  const state = $('state-filter').value || homeState;
+  $('national-links').replaceChildren(...(data.links || []).filter((item) => !item.state || item.state === state).map((item) => {
+    const anchor = link(item.label, item.url);
+    anchor.title = item.description || item.label;
+    anchor.append(element('span', 'external-arrow', '↗'));
+    return anchor;
+  }));
+}
+
 function renderRaces() {
   if (!data) return;
+  renderNationalLinks();
   const focusKey = document.activeElement?.dataset.focusKey;
   const query = $('search').value.trim().toLowerCase();
   const state = $('state-filter').value;
@@ -200,14 +240,14 @@ function renderRaces() {
   $('view-key').setAttribute('aria-pressed', String(keyOnly));
   $('view-pinned').setAttribute('aria-pressed', String(watchlistOnly));
   const ranks = { Senate: 0, Governor: 1, House: 2, Other: 3 };
-  const races = all.filter((race) => (!watchlistOnly || pins.has(race.id)) && (!keyOnly || race.keyRace || race.state === 'AR') && (!state || race.state === state) && (!office || race.office === office) && (!query || [race.name, race.state, race.office, ...race.candidates.map((candidate) => candidate.name)].join(' ').toLowerCase().includes(query))).sort((a, b) => Number(pins.has(b.id)) - Number(pins.has(a.id)) || (ranks[a.office] ?? 4) - (ranks[b.office] ?? 4) || a.state.localeCompare(b.state) || a.name.localeCompare(b.name, undefined, { numeric: true }));
-  $('results-count').textContent = `${number.format(races.length)} of ${number.format(all.length)} monitored races${watchlistOnly ? ' · Watchlist' : keyOnly ? ' · Key races + Arkansas' : ''}${races.length > visibleLimit ? ` · first ${visibleLimit} shown` : ''}`;
+  const races = all.filter((race) => (!watchlistOnly || pins.has(race.id)) && (!keyOnly || race.keyRace || (homeState && race.state === homeState)) && (!state || race.state === state) && (!office || race.office === office) && (!query || [race.name, race.state, race.office, ...race.candidates.map((candidate) => candidate.name)].join(' ').toLowerCase().includes(query))).sort((a, b) => Number(pins.has(b.id)) - Number(pins.has(a.id)) || (ranks[a.office] ?? 4) - (ranks[b.office] ?? 4) || a.state.localeCompare(b.state) || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  $('results-count').textContent = `${number.format(races.length)} of ${number.format(all.length)} monitored races${watchlistOnly ? ' · Watchlist' : keyOnly ? ` · Key races${homeState ? ` + ${stateNames[homeState]}` : ''}` : ''}${races.length > visibleLimit ? ` · first ${visibleLimit} shown` : ''}`;
   const grid = $('race-grid');
   if (!races.length) {
-    if (state === 'AR' && !all.some((race) => race.state === 'AR')) {
-      const box = emptyState('Arkansas results are not connected yet', 'Use the Arkansas results link for local returns. National chamber coverage remains available above.', true);
-      const arkansas = (data.links || []).find((item) => /arkansas/i.test(item.label));
-      if (arkansas) box.append(link('Arkansas official results ↗', arkansas.url, 'race-source-link'));
+    if (state && !all.some((race) => race.state === state)) {
+      const box = emptyState(`No connected races for ${stateNames[state] || state}`, 'This dashboard does not have a results feed for this selection. National coverage remains above.', true);
+      const official = (data.links || []).find((item) => item.state === state);
+      if (official) box.append(link(official.label + ' ↗', official.url, 'race-source-link'));
       grid.replaceChildren(box);
       return;
     }
@@ -273,17 +313,6 @@ function render() {
   $('metric-states').textContent = number.format(states.length);
   $('metric-state-list').textContent = states.join(' · ') || 'No connected results yet';
   $('metric-sources').textContent = `${data.sources.filter((source) => !stale(source)).length} / ${data.sources.length}`;
-  const selected = $('state-filter').value;
-  const filterStates = [...new Set([...states, 'AR'])].sort();
-  const options = [new Option('All states', ''), ...filterStates.map((state) => new Option(state, state))];
-  $('state-filter').replaceChildren(...options);
-  if (filterStates.includes(selected)) $('state-filter').value = selected;
-  $('national-links').replaceChildren(...(data.links || []).map((item) => {
-    const anchor = link(item.label, item.url);
-    anchor.title = item.description || item.label;
-    anchor.append(element('span', 'external-arrow', '↗'));
-    return anchor;
-  }));
   renderChambers();
   renderFlips();
   renderSources();
@@ -385,13 +414,13 @@ async function load() {
   } catch {
     apiFailed = true;
     $('alert').hidden = false;
-    $('alert').textContent = data ? 'The local results service is not responding. Last available data remains below; it may be out of date. Retrying automatically.' : 'The local results service is not responding. Keep this page open; it will retry automatically.';
+    $('alert').textContent = data ? 'The results service is not responding. Last available data remains below; it may be out of date. Retrying automatically.' : 'The results service is not responding. Keep this page open; it will retry automatically.';
     if (data) render();
     else {
       $('connection-status').textContent = '△ Service unavailable';
       $('connection-status').className = 'status status-warning';
       $('refresh-note').textContent = 'Retrying every 60 seconds';
-      $('race-grid').replaceChildren(emptyState('Results temporarily unavailable', 'Try Refresh. The dashboard needs its local server to fetch official results.'));
+      $('race-grid').replaceChildren(emptyState('Results temporarily unavailable', 'Try Refresh. The dashboard will retry the results service automatically.'));
     }
   } finally {
     fetching = false;
@@ -405,7 +434,29 @@ $('refresh').addEventListener('click', load);
 $('view-all').addEventListener('click', () => { watchlistOnly = false; keyOnly = false; visibleLimit = 60; renderRaces(); });
 $('view-key').addEventListener('click', () => { watchlistOnly = false; keyOnly = true; visibleLimit = 60; renderRaces(); });
 $('view-pinned').addEventListener('click', () => { watchlistOnly = true; keyOnly = false; visibleLimit = 60; renderRaces(); });
-$('arkansas-focus').addEventListener('click', () => { $('state-filter').value = 'AR'; watchlistOnly = false; keyOnly = false; visibleLimit = 60; renderRaces(); });
+const stateOptions = Object.entries(stateNames).sort((a, b) => a[1].localeCompare(b[1]));
+$('home-state').append(...stateOptions.map(([code, name]) => new Option(name, code)));
+$('state-filter').append(...stateOptions.map(([code, name]) => new Option(name, code)));
+$('home-state').addEventListener('change', () => {
+  homeState = $('home-state').value;
+  try { localStorage.setItem('election-night-home-state', homeState); } catch {}
+  const url = new URL(window.location.href);
+  homeState ? url.searchParams.set('state', homeState) : url.searchParams.delete('state');
+  history.replaceState(null, '', url);
+  renderLocation();
+  visibleLimit = 60;
+  renderRaces();
+});
+$('home-focus').addEventListener('click', () => {
+  $('state-filter').value = homeState;
+  $('search').value = '';
+  $('office-filter').value = '';
+  watchlistOnly = false;
+  keyOnly = false;
+  visibleLimit = 60;
+  renderRaces();
+});
+renderLocation();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 function tick() {
   $('local-clock').textContent = timeFormat.format(new Date());

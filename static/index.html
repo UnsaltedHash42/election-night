@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="A personal election night watchlist with official reported results and clear source status.">
+  <meta name="description" content="Follow election night results, national control, called flips and races in your state with clear source status.">
   <title>Election Night · November 3, 2026</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
@@ -21,6 +21,7 @@
         <div><p class="eyebrow">NOVEMBER 3, 2026 · U.S. MIDTERMS</p><h1 id="page-title">The balance of power.</h1><p class="intro-copy">House. Senate. The races that shape the night.</p></div>
         <div class="connection"><span id="connection-status" class="status status-loading">◌ Connecting</span><span id="refresh-note">Checking for results…</span></div>
       </section>
+      <section class="location-settings" aria-label="Your location"><div class="location-controls"><label for="home-state">Home state</label><select id="home-state" aria-describedby="location-note"><option value="">National overview</option></select><button type="button" id="home-focus" class="state-chip" hidden>Show home state</button></div><p id="location-note">Choose a home state to add its races to Key races. National control and flips stay visible.</p></section>
       <div id="alert" class="alert" role="status" hidden></div>
       <section class="chamber-section" aria-label="National House and Senate control"><div id="chambers" class="chambers"><div class="chamber-card"><span class="eyebrow">NATIONAL CONTROL</span><h2>House & Senate</h2><p class="muted">Checking national reporting sources…</p></div></div></section>
       <section class="national-strip" aria-label="National coverage"><div><span class="eyebrow">THE NATIONAL PICTURE</span><p>Full-country results and race calls</p></div><div id="national-links" class="national-links"></div></section>
@@ -35,7 +36,7 @@
         <section id="races" class="race-section" aria-labelledby="race-title">
           <div class="section-heading"><div><h2 id="race-title">Race desk</h2><p id="results-count" role="status">Loading official feeds…</p></div><div class="view-switch" role="group" aria-label="Race view"><button class="active" id="view-all" type="button" aria-pressed="true">All races</button><button id="view-key" type="button" aria-pressed="false">Key races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
           <div class="filters"><label class="search-label"><span class="sr-only">Search races or candidates</span><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="Find a race or candidate" autocomplete="off"></label><label><span class="sr-only">Filter by state</span><select id="state-filter"><option value="">All states</option></select></label><label><span class="sr-only">Filter by office</span><select id="office-filter"><option value="">All offices</option><option>Senate</option><option>House</option><option>Governor</option><option>Other</option></select></label></div>
-          <div class="coverage-row"><p class="coverage-note">Coverage varies by source · Vote totals unofficial · AP calls labeled separately</p><button type="button" id="arkansas-focus" class="state-chip">Arkansas focus</button></div>
+          <div class="coverage-row"><p class="coverage-note">Coverage varies by source · Vote totals unofficial · AP calls labeled separately</p></div>
           <div id="race-grid" class="race-grid"><div class="empty-state"><span class="empty-symbol" aria-hidden="true">◌</span><h3>Opening the results desk</h3><p>Checking official feeds for today’s election.</p></div></div>
         </section>
         <aside class="sidebar" aria-label="Timing and sources">
@@ -45,7 +46,7 @@
         </aside>
       </div>
     </main>
-    <footer><span>Election Night / Personal results desk</span><span>AP race calls · Official reported votes · No local forecasts</span></footer>
+    <footer><span>Election Night / Results desk</span><span>AP race calls · Official reported votes · No local forecasts</span></footer>
   </div>
 </body>
 </html>

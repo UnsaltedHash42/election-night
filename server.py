@@ -27,9 +27,9 @@ LINKS = [
     {'label': 'AP national results', 'url': 'https://apnews.com/projects/elections-2026/', 'description': 'National results and race calls'},
     {'label': 'NPR national results', 'url': SOURCE_URLS['npr'], 'description': 'AP calls, House and Senate control'},
     {'label': 'Decision Desk HQ', 'url': 'https://votes.decisiondeskhq.com/', 'description': 'Independent results and race calls'},
-    {'label': 'Arkansas official results', 'url': 'https://arkansas.tally-enr.com/#bucket=results&filter=Federal&contest=eafd140a-9378-43a2-bd6d-f8661524139b', 'description': 'Statewide, legislative and ballot questions'},
-    {'label': 'Sherwood / Pulaski local races', 'url': 'https://votes.decisiondeskhq.com/elections/2026-11-03/arkansas/pulaski', 'description': 'Sherwood mayor and wards; DDHQ local results'},
-    {'label': 'Pulaski County official results', 'url': 'https://votepulaskiar.gov/election-results/', 'description': 'Local results expected after 7:30 p.m. Central'},
+    {'label': 'Arkansas official results', 'url': 'https://arkansas.tally-enr.com/#bucket=results&filter=Federal&contest=eafd140a-9378-43a2-bd6d-f8661524139b', 'description': 'Statewide, legislative and ballot questions', 'state': 'AR'},
+    {'label': 'Sherwood / Pulaski local races', 'url': 'https://votes.decisiondeskhq.com/elections/2026-11-03/arkansas/pulaski', 'description': 'Sherwood mayor and wards; DDHQ local results', 'state': 'AR'},
+    {'label': 'Pulaski County official results', 'url': 'https://votepulaskiar.gov/election-results/', 'description': 'Local results expected after 7:30 p.m. Central', 'state': 'AR'},
 ]
 POLL_CLOSINGS = [
     {'state': 'IN/KY', 'label': 'First polls · parts of Indiana & Kentucky', 'at': '2026-11-03T23:00:00Z', 'note': 'Other parts close an hour later', 'url': 'https://apnews.com/article/0e2078f16af285b22675445d78360e6d'},
