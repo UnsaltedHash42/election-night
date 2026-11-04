@@ -27,7 +27,7 @@ function payload(office, name, called = false) {
 const response = (data, status = 200, retry = null) => ({ ok:status === 200, status,
   headers:{ get:() => retry }, json:async() => data });
 
-function setup(fetchResults, fetchShapes = () => response(shapes)) {
+function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = () => response(null, 404)) {
   let now = started, serial = 0;
   const timers = new Map(), requests = [], explored = [], handlers = {};
   const document = { hidden:false, activeElement:null, addEventListener:(name, callback) => { handlers[name] = callback; } };
@@ -62,6 +62,7 @@ function setup(fetchResults, fetchShapes = () => response(shapes)) {
     clearTimeout:id => timers.delete(id),
     fetch:async(url, options) => {
       if (url === '/map-shapes.json') return fetchShapes();
+      if (url.includes('apps.npr.org')) return fetchNpr(url);
       const request = { url, signal:options.signal, at:now };
       requests.push(request);
       return fetchResults(request, requests.length);
@@ -194,4 +195,22 @@ test('a failed geometry load can be retried without starting duplicate result ch
   assert.equal(env.requests.length, 1);
   await env.advance(60000);
   assert.equal(env.requests.length, 2);
+});
+
+test('a contradicting AP count marks the race disputed without replacing it', async() => {
+  const npr = () => response({ results:[
+    { test:false, state:'AR', office:'S', type:'General', winnerId:null,
+      candidates:[{ id:4, first:'Rival', last:'Leader', party:'GOP', votes:900, percent:0.61 }] },
+    { test:false, state:'GA', office:'S', type:'General', winnerId:null,
+      candidates:[{ id:5, first:'Same', last:'Leader', party:'Dem', votes:900, percent:0.6 }] }
+  ]});
+  const env = setup(request => response(payload('senate', 'Known leader')), undefined, npr);
+  await env.flush();
+  assert.match(env.el('map-status').textContent, /1 race where AP and this feed disagree/);
+  assert.match(env.el('map-detail').textContent, /⚠ Sources disagree/);
+  assert.match(env.el('map-detail').textContent, /Rival Leader/);
+  assert.match(env.el('map-detail').textContent, /Known leader/);
+  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /disputed/);
+  assert.doesNotMatch(env.map.nodes.get('GA').path.getAttribute('class'), /disputed/);
+  assert.match(env.map.nodes.get('AR').path.getAttribute('aria-label'), /Sources disagree/);
 });

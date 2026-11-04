@@ -41,3 +41,49 @@ test('old source checks stay marked and percentages never imply certification', 
   assert.equal(status.kind, 'leading');
   assert.equal(status.stale, true);
 });
+
+test('NPR rows normalize to race ids with leaders, winners and shares intact', () => {
+  const env = context();
+  const rows = env.readNprRaces({ results:[
+    { test:false, state:'TX', office:'S', type:'General', winnerId:null,
+      candidates:[
+        { id:1, first:'James', last:'Talarico', party:'Dem', votes:2519629, percent:0.5815 },
+        { id:2, first:'Ken', last:'Paxton', party:'GOP', votes:1746623, percent:0.4031 },
+        { id:3, last:'Other', party:'Other', votes:66376 }] },
+    { test:false, state:'AK', office:'H', type:'General', seatNumber:0,
+      candidates:[{ id:9, first:'A', last:'B', party:'GOP', votes:5 }] },
+    { test:false, state:'GA', office:'S', type:'Special General',
+      candidates:[{ id:9, first:'A', last:'B', party:'Dem', votes:5 }] },
+    { test:true, state:'FL', office:'S', type:'General',
+      candidates:[{ id:9, first:'A', last:'B', party:'Dem', votes:5 }] },
+    { test:false, state:'ZZZ', office:'S', type:'General',
+      candidates:[{ id:9, first:'A', last:'B', party:'Dem', votes:5 }] },
+    { test:false, state:'GA', office:'S', type:'General', winnerId:1,
+      candidates:[{ id:1, first:'W', last:'Inner', party:'Dem', votes:9 }, { id:2, first:'X', last:'Outer', party:'GOP', votes:4 }] }
+  ]});
+  assert.equal(rows.size, 3);
+  const tx = rows.get('tx-senate');
+  assert.equal(tx.leader.name, 'James Talarico');
+  assert.equal(tx.leader.party, 'dem');
+  assert.equal(tx.percent, 58.2);
+  assert.equal(tx.winner, null);
+  assert.ok(rows.has('ak-house-00'));
+  assert.equal(rows.get('ga-senate').winner.name, 'W Inner');
+  assert.throws(() => env.readNprRaces({}), /Invalid NPR/);
+});
+
+test('provider conflicts are flagged without trusting either side', () => {
+  const env = context();
+  const lead = { result:{ ...result, leadName:'Ken Paxton', leadParty:'Republican', leadPercent:52, secondPercent:46.1 } };
+  const status = env.mapRaceStatus(lead);
+  const conflict = env.crossConflict(lead, status, { winner:null, leader:{ name:'James Talarico', party:'dem' }, percent:58.2 });
+  assert.match(conflict, /AP via NPR currently shows James Talarico \(Democratic\) leading with 58\.2%/);
+  assert.equal(env.crossConflict(lead, status, { winner:null, leader:{ name:'Ken Paxton', party:'rep' } }), null);
+  const calledByAp = { winner:{ name:'James Talarico', party:'dem' }, leader:{ name:'James Talarico', party:'dem' } };
+  assert.match(env.crossConflict(lead, status, calledByAp), /already called this race for James Talarico/);
+  const unlisted = { result:{ ...result, leadParty:null, leadPercent:52, secondPercent:40 } };
+  assert.equal(env.crossConflict(unlisted, env.mapRaceStatus(unlisted), { winner:null, leader:{ name:'Anyone', party:'dem' } }), null);
+  const called = env.mapRaceStatus({ result:{ ...result, call:'called', winner:'lead', winnerName:'Ken Paxton', winnerParty:'Republican' } });
+  assert.match(env.crossConflict({ result:{} }, called, calledByAp), /AP via NPR shows James Talarico \(Democratic\) as the winner/);
+  assert.equal(env.crossConflict(lead, status, null), null);
+});

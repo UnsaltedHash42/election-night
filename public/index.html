@@ -11,6 +11,7 @@
   <script src="/map.js" defer></script>
   <script src="/markets.js" defer></script>
   <script src="/forecast.js" defer></script>
+  <script src="/crashout.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -39,7 +40,7 @@
           <div class="map-legend" aria-label="Map legend"><span><i class="dem"></i>D · Democratic</span><span><i class="rep"></i>R · Republican</span><span><i class="other"></i>Other / unknown party</span><span>✓ Solid: called</span><span>▧ Hatched: leading, not called</span><span>— Gray: no result / no race</span></div>
         </div><aside id="map-detail" class="map-detail" aria-label="Selected map race"><h3>Select a state or district</h3><p>Choose a race to inspect its result and source.</p></aside></div>
         <div class="map-footer"><p>Results: <a href="https://watch.vote/midterms/2026" target="_blank" rel="noopener noreferrer">watch.vote</a> and the officials named in each race; coverage may lag AP. Refreshes about every minute while visible. Alaska and Hawaii are insets; use the state picker for small districts.</p><button id="map-retry" class="button" type="button">Retry</button></div>
-        <p class="map-footnote">This map covers races on the 2026 ballot, not seats held over from earlier elections. Missing data stays gray; a lead is never a call. House boundaries: <a href="https://watch.vote/docs/api-reference/elections" target="_blank" rel="noopener noreferrer">2026 Census snapshot via watch.vote</a>.</p>
+        <p class="map-footnote">This map covers races on the 2026 ballot, not seats held over from earlier elections. Missing data stays gray; a lead is never a call. Every race is cross-checked against AP counts via NPR’s public feed — races where the two sources disagree get a dashed outline and a ⚠ comparison in the details. House boundaries: <a href="https://watch.vote/docs/api-reference/elections" target="_blank" rel="noopener noreferrer">2026 Census snapshot via watch.vote</a>.</p>
       </section>
       <section class="national-section" aria-labelledby="national-title">
         <div class="section-heading"><div><h2 id="national-title">The national picture</h2><p>Full national tallies and called party changes are on NPR and AP.</p></div></div>
@@ -76,6 +77,12 @@
         <p id="call-announcement" class="call-announcement" role="status" aria-live="polite" aria-atomic="true" hidden></p>
         <div id="call-events" class="call-events"><p class="call-empty">No calls observed yet. A lead never triggers an alert.</p></div>
         <p class="call-footnote">Times below say when this browser detected a change, not when the race was called. Each race's first check establishes a baseline without sounding an alert.</p>
+      </section>
+      <section class="crashout-section" aria-labelledby="crashout-title">
+        <div class="section-heading"><div><h2 id="crashout-title">Crash-out watch</h2><p id="crashout-status" role="status">Opening social feeds…</p></div><button id="crashout-retry" class="button" type="button">Retry</button></div>
+        <p class="coverage-note">Live Bluesky accounts tracking Trump's Truth Social posts and election-night reaction. Truth Social blocks framing and public API reads, so his own posts appear as quoted by these feeds. Posts are reactions and opinions — not results, calls or odds.</p>
+        <p id="crashout-warning" class="map-warning" role="status" hidden></p>
+        <div id="crashout-feed" class="crashout-feed"><p class="call-empty">No posts loaded yet.</p></div>
       </section>
       <section class="location-settings" aria-label="Your location">
         <div class="location-controls"><label for="home-state">Home state</label><select id="home-state" aria-describedby="location-note"><option value="">National overview</option></select><button id="home-focus" class="button" type="button" hidden>Show home state</button></div>

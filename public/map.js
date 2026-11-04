@@ -26,6 +26,56 @@ function mapRaceStatus(row) {
   return { kind:'waiting', party:'none', stale, text:'Awaiting a reported lead · Not called' };
 }
 
+function nprParty(value) {
+  if (value === 'Dem') return 'dem';
+  if (/^(GOP|Rep)/.test(value || '')) return 'rep';
+  return 'other';
+}
+
+function readNprRaces(data) {
+  if (!data || !Array.isArray(data.results)) throw new Error('Invalid NPR results');
+  const map = new Map();
+  for (const item of data.results) {
+    if (item?.test !== false || !/^[A-Z]{2}$/.test(item?.state || '')) continue;
+    let id;
+    if (item.office === 'S' && item.type === 'General') id = `${item.state.toLowerCase()}-senate`;
+    else if (item.office === 'G' && item.type === 'General') id = `${item.state.toLowerCase()}-governor`;
+    else if (item.office === 'H' && ['General', 'Nonpartisan Election'].includes(item.type)) {
+      const district = ['AK', 'DE', 'ND', 'SD', 'VT', 'WY'].includes(item.state) ? 0 : item.seatNumber;
+      if (!Number.isInteger(district)) continue;
+      id = `${item.state.toLowerCase()}-house-${String(district).padStart(2, '0')}`;
+    } else continue;
+    const candidates = (item.candidates || []).filter(candidate => candidate.party !== 'Other'
+      && Number.isFinite(candidate.votes) && candidate.votes > 0 && (candidate.last || candidate.first));
+    if (!candidates.length) continue;
+    const winner = item.winnerId != null ? candidates.find(candidate => String(candidate.id) === String(item.winnerId)) : null;
+    const leader = candidates.reduce((best, candidate) => (candidate.votes > best.votes ? candidate : best));
+    const name = candidate => `${candidate.first || ''} ${candidate.last || ''}`.trim();
+    map.set(id, {
+      winner: winner ? { name:name(winner), party:nprParty(winner.party) } : null,
+      leader: { name:name(leader), party:nprParty(leader.party) },
+      percent: Number.isFinite(leader.percent) ? Math.round(leader.percent * 1000) / 10 : null
+    });
+  }
+  return map;
+}
+
+function crossConflict(row, status, cross) {
+  if (!cross) return null;
+  const label = party => ({ dem:'Democratic', rep:'Republican' })[party] || 'a third party';
+  if (['called', 'certified'].includes(status.kind)) {
+    if (cross.winner && cross.winner.party !== status.party)
+      return `AP via NPR shows ${cross.winner.name} (${label(cross.winner.party)}) as the winner here.`;
+    return null;
+  }
+  if (status.kind !== 'leading' || !row?.result?.leadParty) return null;
+  if (cross.winner && cross.winner.party !== mapParty(row.result.leadParty))
+    return `AP via NPR has already called this race for ${cross.winner.name} (${label(cross.winner.party)}).`;
+  if (cross.leader && cross.leader.party !== mapParty(row.result.leadParty))
+    return `AP via NPR currently shows ${cross.leader.name} (${label(cross.leader.party)}) leading${cross.percent !== null ? ` with ${cross.percent.toFixed(1)}%` : ''}.`;
+  return null;
+}
+
 window.ElectionMap = class ElectionMap {
   constructor({ stateNames, homeState, onExplore }) {
     this.names = stateNames;
@@ -35,6 +85,7 @@ window.ElectionMap = class ElectionMap {
     this.selectedRace = homeState ? `${homeState.toLowerCase()}-senate` : '';
     this.races = [];
     this.cache = new Map();
+    this.cross = { byRace:new Map(), checkedAt:null };
     this.nodes = new Map();
     this.generation = 0;
     this.time = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' });
@@ -132,18 +183,30 @@ window.ElectionMap = class ElectionMap {
       clearTimeout(timeout);
       if (generation === this.generation) {
         this.loading = false;
+        await this.loadCross(office, generation);
         this.render();
         if (!document.hidden) this.timer = setTimeout(() => this.refresh(), delay);
       }
     }
   }
 
+  async loadCross(office, generation) {
+    try {
+      const response = await fetch(`https://apps.npr.org/2026-election-results/data/${office === 'governors' ? 'gov' : office}.json`, { signal:AbortSignal.timeout(15000) });
+      if (!response.ok) return;
+      const byRace = readNprRaces(await response.json());
+      if (generation !== this.generation) return;
+      this.cross = { byRace, checkedAt:Date.now() };
+    } catch { /* the last successful cross-check stays in place */ }
+  }
+
   renderStatus() {
     const saved = this.cache.get(this.office);
     const rows = saved?.payload.rows || [];
     const called = rows.filter(row => mapRaceStatus(row).kind === 'called').length;
+    const disputed = rows.filter(row => crossConflict(row, mapRaceStatus(row), this.cross.byRace.get(row.raceId.replace(/^2026-/, '')))).length;
     this.el('map-status').textContent = document.hidden ? 'Ⅱ Map checks paused in background'
-      : saved ? `${rows.filter(row => row.result).length} races with results · ${called} called in this feed · Checked ${this.time.format(new Date(saved.checkedAt))}${this.loading ? ' · Updating…' : ''}`
+      : saved ? `${rows.filter(row => row.result).length} races with results · ${called} called in this feed${disputed ? ` · ⚠ ${disputed} ${disputed === 1 ? 'race where' : 'races where'} AP and this feed disagree` : ''} · Checked ${this.time.format(new Date(saved.checkedAt))}${this.loading ? ' · Updating…' : ''}`
       : this.loading ? 'Loading results…' : 'Waiting for results';
     this.el('map-error').hidden = !this.error;
     this.el('map-error').textContent = this.error || '';
@@ -196,11 +259,12 @@ window.ElectionMap = class ElectionMap {
     for (const { shape, path, title } of this.nodes.values()) {
       const race = raceByShape.get(shape.id);
       const status = race ? mapRaceStatus(rows.get(race.id)) : { kind:'no-race', party:'none', text:`No ${this.officeName()} race in 2026` };
+      const conflict = race ? crossConflict(rows.get(race.id), status, this.cross.byRace.get(race.id)) : null;
       const selected = race ? race.id === this.selectedRace : shape.id === this.selectedState;
-      path.setAttribute('class', `map-region ${status.kind} ${status.party}${status.stale ? ' stale' : ''}${selected ? ' selected' : ''}`);
-      path.setAttribute('aria-label', `${race?.name || shape.name}: ${status.text}${status.stale ? ' · Source check over 10 minutes old' : ''}`);
+      path.setAttribute('class', `map-region ${status.kind} ${status.party}${status.stale ? ' stale' : ''}${conflict ? ' disputed' : ''}${selected ? ' selected' : ''}`);
+      path.setAttribute('aria-label', `${race?.name || shape.name}: ${status.text}${status.stale ? ' · Source check over 10 minutes old' : ''}${conflict ? ' · Sources disagree' : ''}`);
       path.setAttribute('aria-pressed', String(selected));
-      title.textContent = `${race?.name || shape.name}: ${status.text}`;
+      title.textContent = `${race?.name || shape.name}: ${status.text}${conflict ? ' · Sources disagree' : ''}`;
     }
     for (const office of ['senate', 'house', 'governors']) this.el(`map-${office}`).setAttribute('aria-pressed', String(this.office === office));
     const choices = officeRaces.filter(race => !zoom || race.state === zoom);
@@ -224,6 +288,14 @@ window.ElectionMap = class ElectionMap {
     } else {
       const result = row?.result, status = mapRaceStatus(row);
       content.push(this.node('p', `map-outcome ${status.kind}`, status.text));
+      const conflict = crossConflict(row, status, this.cross.byRace.get(race.id));
+      if (conflict) {
+        content.push(this.node('p', 'map-conflict', `⚠ Sources disagree — ${conflict}`));
+        const compare = this.node('a', '', 'Compare at NPR’s AP results ↗');
+        compare.href = 'https://apps.npr.org/2026-election-results/';
+        compare.target = '_blank'; compare.rel = 'noopener noreferrer';
+        content.push(compare);
+      }
       for (const prefix of ['lead', 'second']) {
         if (result?.[`${prefix}Name`]) content.push(this.node('p', 'map-candidate',
           `${result[`${prefix}Name`]} · ${result[`${prefix}Party`] || 'Party not listed'} · ${typeof result[`${prefix}Percent`] === 'number' ? `${result[`${prefix}Percent`].toFixed(1)}%` : 'No vote share yet'}`));
