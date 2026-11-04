@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/styles.css">
   <script src="/call-alerts.js" defer></script>
   <script src="/map.js" defer></script>
+  <script src="/markets.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -46,6 +47,20 @@
           <article class="national-card"><span class="eyebrow amber">SEATS & GOVERNORSHIPS</span><h3>Which races change hands?</h3><p>Follow AP’s national coverage for called winners and party changes.</p><a class="source-button" href="https://apnews.com/projects/elections-2026/" target="_blank" rel="noopener noreferrer">Open AP election results <span aria-hidden="true">↗</span></a></article>
         </div>
         <p class="national-note">The map shows 2026 races; national control and party changes are tracked by these outlets. <a href="https://votes.decisiondeskhq.com/" target="_blank" rel="noopener noreferrer">Decision Desk HQ coverage ↗</a></p>
+      </section>
+      <section class="market-section" aria-labelledby="markets-title">
+        <div class="section-heading"><div><h2 id="markets-title">What the markets expect</h2><p>Polymarket odds · Market prices are not vote counts or race calls.</p></div><button id="markets-refresh" class="button" type="button">Refresh odds</button></div>
+        <div class="market-grid">
+          <article class="market-card"><h3>House control</h3><iframe title="Polymarket: Democratic control of the House" loading="lazy" src="https://embed.polymarket.com/market?market=will-the-democratic-party-control-the-house-after-the-2026-midterm-elections&amp;theme=dark&amp;buttons=false&amp;fit=true&amp;height=400"></iframe><a href="https://polymarket.com/event/which-party-will-win-the-house-in-2026" target="_blank" rel="noopener noreferrer">Open House control market ↗</a></article>
+          <article class="market-card"><h3>Senate control</h3><iframe title="Polymarket: Democratic control of the Senate" loading="lazy" src="https://embed.polymarket.com/market?market=will-the-democratic-party-control-the-senate-after-the-2026-midterm-elections&amp;theme=dark&amp;buttons=false&amp;fit=true&amp;height=400"></iframe><a href="https://polymarket.com/event/which-party-will-win-the-senate-in-2026" target="_blank" rel="noopener noreferrer">Open Senate control market ↗</a></article>
+          <article class="market-card"><label for="market-race">Key race market</label><select id="market-race">
+            <option value="will-the-democrats-win-the-texas-senate-race-in-2026" data-event="texas-senate-election-winner">Texas Senate</option>
+            <option value="will-the-democrats-win-the-maine-senate-race-in-2026" data-event="maine-senate-election-winner">Maine Senate</option>
+            <option value="will-the-democrats-win-the-georgia-governor-race-in-2026" data-event="georgia-governor-winner-2026">Georgia governor</option>
+            <option value="will-the-democrats-win-the-michigan-governor-race-in-2026" data-event="michigan-governor-winner-2026">Michigan governor</option>
+          </select><iframe id="market-race-frame" title="Polymarket: Democratic victory in Texas Senate" loading="lazy" src="https://embed.polymarket.com/market?market=will-the-democrats-win-the-texas-senate-race-in-2026&amp;theme=dark&amp;buttons=false&amp;fit=true&amp;height=400"></iframe><a id="market-race-link" href="https://polymarket.com/event/texas-senate-election-winner" target="_blank" rel="noopener noreferrer">Open Texas Senate market ↗</a></article>
+        </div>
+        <p id="markets-status" class="coverage-note" role="status">Widgets supplied by Polymarket. Each question defines Yes and No; “No” does not necessarily mean Republican. Use Refresh odds or the source links if a widget stalls.</p>
       </section>
       <section class="call-section" aria-labelledby="calls-title">
         <div class="section-heading"><div><h2 id="calls-title">Call alerts</h2><p id="calls-status" role="status">Opening the call monitor…</p></div><div class="call-controls"><button id="alerts-pause" class="button" type="button" aria-pressed="false">Pause alerts</button><button id="alerts-sound" class="button" type="button" aria-pressed="false">Enable sound</button></div></div>
