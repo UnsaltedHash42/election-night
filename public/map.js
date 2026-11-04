@@ -51,27 +51,6 @@ function providerConflict(row) {
   return `watch.vote shows ${watch.leadName} (${watch.leadParty}) leading with ${watch.leadPercent.toFixed(1)}%.`;
 }
 
-const oddsRaces = {
-  'tx-senate':{ slug:'will-the-democrats-win-the-texas-senate-race-in-2026', event:'texas-senate-election-winner' },
-  'me-senate':{ slug:'will-the-democrats-win-the-maine-senate-race-in-2026', event:'maine-senate-election-winner' },
-  'ga-governor':{ slug:'will-the-democrats-win-the-georgia-governor-race-in-2026', event:'georgia-governor-winner-2026' },
-  'mi-governor':{ slug:'will-the-democrats-win-the-michigan-governor-race-in-2026', event:'michigan-governor-winner-2026' }
-};
-
-function parseOddsMarket(data) {
-  const market = Array.isArray(data) ? data[0] : null;
-  if (!market || market.closed === true) return null;
-  let outcomes, prices;
-  try {
-    outcomes = typeof market.outcomes === 'string' ? JSON.parse(market.outcomes) : market.outcomes;
-    prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices;
-  } catch { return null; }
-  if (!Array.isArray(outcomes) || !Array.isArray(prices)) return null;
-  const index = outcomes.indexOf('Yes');
-  const yes = index >= 0 ? Number(prices[index]) : NaN;
-  return Number.isFinite(yes) && yes >= 0 && yes <= 1 ? { yes } : null;
-}
-
 window.ElectionMap = class ElectionMap {
   constructor({ stateNames, homeState, onExplore }) {
     this.names = stateNames;
@@ -82,7 +61,7 @@ window.ElectionMap = class ElectionMap {
     this.races = [];
     this.cache = new Map();
     window.apResults?.subscribe(() => this.render());
-    this.odds = new Map();
+    window.raceOdds?.subscribe(() => this.render());
     this.nodes = new Map();
     this.generation = 0;
     this.time = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' });
@@ -180,23 +159,10 @@ window.ElectionMap = class ElectionMap {
       clearTimeout(timeout);
       if (generation === this.generation) {
         this.loading = false;
-        await this.loadOdds(generation);
         this.render();
         if (!document.hidden) this.timer = setTimeout(() => this.refresh(), delay);
       }
     }
-  }
-
-  async loadOdds(generation) {
-    const reads = Object.entries(oddsRaces).map(async ([raceId, market]) => {
-      try {
-        const response = await fetch(`https://gamma-api.polymarket.com/markets?slug=${market.slug}`, { signal:AbortSignal.timeout(15000) });
-        if (!response.ok) return;
-        const odds = parseOddsMarket(await response.json());
-        if (odds) this.odds.set(raceId, { ...odds, at:Date.now() });
-      } catch { /* the last successful price stays in place */ }
-    });
-    await Promise.all(reads);
   }
 
   mergedRows() {
@@ -287,6 +253,7 @@ window.ElectionMap = class ElectionMap {
       this.pickerSignature = pickerSignature;
     }
     this.el('map-race').value = this.selectedRace;
+    window.raceOdds?.watch('map', [this.selectedRace]);
     this.renderDetail(officeRaces.find(race => race.id === this.selectedRace), rows.get(this.selectedRace));
     this.renderStatus();
   }
@@ -310,11 +277,11 @@ window.ElectionMap = class ElectionMap {
         compare.target = '_blank'; compare.rel = 'noopener noreferrer';
         content.push(compare);
       }
-      const odds = this.odds.get(race.id);
-      if (odds) {
-        content.push(this.node('p', 'map-odds', `Polymarket price: Democratic win ${Math.round(odds.yes * 100)}¢ · a market price, not a count, call or forecast`));
+      const odds = window.raceOdds?.get(race.id);
+      if (window.raceOdds) content.push(this.node('p', 'map-odds', `${oddsText(odds)}${odds?.markets?.length ? ' · a market price, not a count, call or forecast' : ''}`));
+      if (odds?.slug) {
         const market = this.node('a', '', 'Open Polymarket market ↗');
-        market.href = `https://polymarket.com/event/${oddsRaces[race.id].event}`;
+        market.href = `https://polymarket.com/event/${odds.slug}`;
         market.target = '_blank'; market.rel = 'noopener noreferrer';
         content.push(market);
       }

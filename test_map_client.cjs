@@ -27,7 +27,7 @@ function payload(office, name, called = false) {
 const response = (data, status = 200, retry = null) => ({ ok:status === 200, status,
   headers:{ get:() => retry }, json:async() => data });
 
-function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = () => response(null, 404), fetchOdds = () => response(null, 404)) {
+function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = () => response(null, 404)) {
   let now = started, serial = 0;
   const timers = new Map(), requests = [], explored = [], handlers = {};
   const document = { hidden:false, activeElement:null, addEventListener:(name, callback) => {
@@ -64,7 +64,6 @@ function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = ()
     fetch:async(url, options) => {
       if (url === '/map-shapes.json') return fetchShapes();
       if (url.includes('apps.npr.org')) return fetchNpr(url);
-      if (url.includes('gamma-api.polymarket.com')) return fetchOdds(url);
       const request = { url, signal:options.signal, at:now };
       requests.push(request);
       return fetchResults(request, requests.length);
@@ -246,23 +245,4 @@ test('the map follows each new AP update without waiting for its own poll', asyn
   ap = { results:[{ test:false, state:'AR', office:'S', type:'General', candidates:[{ id:1, first:'Early', last:'Lead', party:'Dem', votes:5, winner:'X' }] }] };
   await env.advance(60000); await env.flush();
   assert.match(env.el('map-detail').textContent, /✓ Called: Early Lead \(Democratic\)/);
-});
-
-test('a key race shows its live market price beside the count', async() => {
-  const odds = () => response([{ outcomes:['Yes', 'No'], outcomePrices:['0.61', '0.39'], closed:false }]);
-  const env = setup(request => response(payload('governors', 'Known leader')), undefined, undefined, odds);
-  await env.flush();
-  env.el('map-governors').listeners.click();
-  await env.flush(); await env.flush();
-  env.el('map-race').value = 'ga-governor';
-  env.el('map-race').listeners.change();
-  await env.flush();
-  const detail = env.el('map-detail');
-  assert.match(detail.textContent, /Polymarket price: Democratic win 61¢/);
-  assert.match(detail.textContent, /not a count, call or forecast/);
-  assert.ok(detail.children.find(child => child.tagName === 'a' && (child.href || '').includes('georgia-governor-winner-2026')), 'market link present');
-  env.el('map-race').value = 'ar-governor';
-  env.el('map-race').listeners.change();
-  await env.flush();
-  assert.doesNotMatch(env.el('map-detail').textContent, /Polymarket price/);
 });

@@ -101,16 +101,13 @@ test('watch.vote disagreements with AP are flagged; agreement and missing data a
   assert.equal(env.providerConflict({ ...watchLead, source:'watch.vote' }), null);
 });
 
-test('market prices parse only live Yes/No books', () => {
+test('special Senate elections map to the state seat unless a regular race shares it', () => {
   const env = context();
-  const live = env.parseOddsMarket([{ outcomes:'["Yes", "No"]', outcomePrices:'["0.9935", "0.0065"]', closed:false }]);
-  assert.equal(live.yes, 0.9935);
-  assert.equal(env.parseOddsMarket([{ outcomes:'not json', outcomePrices:'["0.5"]' }]), null);
-  const flipped = env.parseOddsMarket([{ outcomes:['No', 'Yes'], outcomePrices:['0.4', '0.6'], closed:false }]);
-  assert.equal(flipped.yes, 0.6);
-  assert.equal(env.parseOddsMarket([{ outcomes:['Yes', 'No'], outcomePrices:['0.61', '0.39'], closed:true }]), null);
-  assert.equal(env.parseOddsMarket([{ outcomes:['Maybe'], outcomePrices:['0.5'] }]), null);
-  assert.equal(env.parseOddsMarket([{ outcomes:['Yes', 'No'], outcomePrices:['bogus', '0.2'] }]), null);
-  assert.equal(env.parseOddsMarket([]), null);
-  assert.equal(env.parseOddsMarket('x'), null);
+  const row = (state, type, last) => ({ test:false, state, office:'S', type, candidates:[{ id:1, first:'A', last, party:'Dem', votes:9 }] });
+  const rows = env.readNprRaces({ results:[row('OH', 'Special General', 'Brown'), row('GA', 'General', 'Regular'), row('GA', 'Special General', 'Special'), row('FL', 'Special General', 'Moody')] });
+  assert.equal(rows.get('oh-senate').leader.name, 'A Brown');
+  assert.equal(rows.get('fl-senate').leader.name, 'A Moody');
+  assert.equal(rows.get('ga-senate').leader.name, 'A Regular');
+  const reversed = env.readNprRaces({ results:[row('GA', 'Special General', 'Special'), row('GA', 'General', 'Regular')] });
+  assert.equal(reversed.get('ga-senate').leader.name, 'A Regular');
 });

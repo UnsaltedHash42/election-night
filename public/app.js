@@ -149,6 +149,7 @@ function raceCard(race) {
   });
   header.append(title, pin);
   const ap = element('p', 'race-ap');
+  const odds = element('p', 'race-odds');
   const frame = element('iframe', 'race-frame');
   frame.src = `https://watch.vote/widget/race/${race.slug}?theme=dark`;
   frame.title = `${race.name} — 2026 results from watch.vote`;
@@ -160,7 +161,7 @@ function raceCard(race) {
   source.target = '_blank';
   source.rel = 'noopener noreferrer';
   fallback.append(source, element('span', '', 'Use this link if the card is blank.'));
-  card.append(header, ap, frame, fallback);
+  card.append(header, ap, odds, frame, fallback);
   return card;
 }
 
@@ -179,6 +180,24 @@ function renderApLines() {
     const race = races.find((item) => item.id === card.dataset.raceId);
     const line = card.querySelector('.race-ap');
     if (race && line) line.textContent = apLine(race);
+  }
+}
+
+function renderOddsLines() {
+  if (!window.raceOdds) return;
+  for (const card of $('race-grid').querySelectorAll('.race-card')) {
+    const line = card.querySelector('.race-odds');
+    if (!line) continue;
+    const odds = window.raceOdds.get(card.dataset.raceId);
+    const parts = [document.createTextNode(oddsText(odds))];
+    if (odds?.slug) {
+      const link = element('a', '', ' ↗');
+      link.href = `https://polymarket.com/event/${odds.slug}`;
+      link.target = '_blank'; link.rel = 'noopener noreferrer';
+      link.setAttribute('aria-label', 'Open this Polymarket market');
+      parts.push(link);
+    }
+    line.replaceChildren(...parts);
   }
 }
 
@@ -206,6 +225,7 @@ function render() {
   const pages = Math.ceil(matching.length / pageSize);
   page = Math.min(page, Math.max(0, pages - 1));
   const visible = matching.slice(page * pageSize, (page + 1) * pageSize);
+  window.raceOdds?.watch('desk', visible.map((race) => race.id));
   $('results-count').textContent = `${matching.length} ${matching.length === 1 ? 'race' : 'races'}${view === 'key' ? ` · Key races${homeState ? ` + ${stateNames[homeState]}` : ''}` : view === 'pinned' ? ' · Your watchlist' : ''}${visible.length ? ` · Showing ${page * pageSize + 1}–${page * pageSize + visible.length}` : ''}`;
   $('pagination').hidden = pages <= 1;
   $('page-prev').disabled = page === 0;
@@ -238,6 +258,7 @@ function render() {
     button.setAttribute('aria-label', `${pinned ? 'Unpin' : 'Pin'} ${race.name}`);
   }
   renderApLines();
+  renderOddsLines();
 }
 
 async function loadDirectory() {
@@ -331,3 +352,4 @@ $('alerts-sound').addEventListener('click', async () => {
 updateLocation();
 loadDirectory();
 window.apResults?.subscribe(renderApLines);
+window.raceOdds?.subscribe(renderOddsLines);

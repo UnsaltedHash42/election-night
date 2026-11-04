@@ -12,17 +12,20 @@ function nprPartyName(value) {
 
 function readNprRaces(data) {
   if (!data || !Array.isArray(data.results)) throw new Error('Invalid NPR results');
-  const map = new Map();
+  const map = new Map(), regular = new Set();
   for (const item of data.results) {
     if (item?.test !== false || !/^[A-Z]{2}$/.test(item?.state || '')) continue;
     let id;
-    if (item.office === 'S' && item.type === 'General') id = `${item.state.toLowerCase()}-senate`;
-    else if (item.office === 'G' && item.type === 'General') id = `${item.state.toLowerCase()}-governor`;
+    const statewide = ['General', 'Special General'].includes(item.type);
+    if (item.office === 'S' && statewide) id = `${item.state.toLowerCase()}-senate`;
+    else if (item.office === 'G' && statewide) id = `${item.state.toLowerCase()}-governor`;
     else if (item.office === 'H' && ['General', 'Nonpartisan Election'].includes(item.type)) {
       const district = ['AK', 'DE', 'ND', 'SD', 'VT', 'WY'].includes(item.state) ? 0 : Number(item.seatNumber);
       if (!Number.isInteger(district) || district < 0 || String(item.seatNumber).trim() === '') continue;
       id = `${item.state.toLowerCase()}-house-${String(district).padStart(2, '0')}`;
     } else continue;
+    if (item.type === 'Special General' && regular.has(id)) continue;
+    if (item.type !== 'Special General') regular.add(id);
     const named = (item.candidates || []).filter(candidate => candidate.party !== 'Other' && (candidate.last || candidate.first));
     const counted = named.filter(candidate => Number.isFinite(candidate.votes) && candidate.votes > 0).sort((a, b) => b.votes - a.votes);
     const winner = named.find(candidate => candidate.winner === 'X') || null;

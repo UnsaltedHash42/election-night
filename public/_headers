@@ -2,4 +2,4 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src https://watch.vote https://embed.polymarket.com https://votes.decisiondeskhq.com; connect-src 'self' https://watch.vote https://public.api.bsky.app https://apps.npr.org https://gamma-api.polymarket.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src https://watch.vote https://embed.polymarket.com https://votes.decisiondeskhq.com; connect-src 'self' https://watch.vote https://public.api.bsky.app https://apps.npr.org https://gamma-api.polymarket.com https://clob.polymarket.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
