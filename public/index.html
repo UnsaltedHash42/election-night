@@ -78,12 +78,6 @@
         <div id="call-events" class="call-events"><p class="call-empty">No calls observed yet. A lead never triggers an alert.</p></div>
         <p class="call-footnote">Times below say when this browser detected a change, not when the race was called. Each race's first check establishes a baseline without sounding an alert.</p>
       </section>
-      <section class="crashout-section" aria-labelledby="crashout-title">
-        <div class="section-heading"><div><h2 id="crashout-title">Crash-out watch</h2><p id="crashout-status" role="status">Opening social feeds…</p></div><button id="crashout-retry" class="button" type="button">Retry</button></div>
-        <p class="coverage-note">Live Bluesky accounts tracking Trump's Truth Social posts and election-night reaction. Truth Social blocks framing and public API reads, so his own posts appear as quoted by these feeds. Posts are reactions and opinions — not results, calls or odds.</p>
-        <p id="crashout-warning" class="map-warning" role="status" hidden></p>
-        <div id="crashout-feed" class="crashout-feed"><p class="call-empty">No posts loaded yet.</p></div>
-      </section>
       <section class="location-settings" aria-label="Your location">
         <div class="location-controls"><label for="home-state">Home state</label><select id="home-state" aria-describedby="location-note"><option value="">National overview</option></select><button id="home-focus" class="button" type="button" hidden>Show home state</button></div>
         <p id="location-note">Choose a state to include its races in Key races. Your choice stays in this browser.</p>
@@ -101,6 +95,12 @@
         <nav id="pagination" class="pagination" aria-label="Race pages" hidden><button id="page-prev" class="button" type="button" aria-controls="race-grid">← Previous</button><span id="page-label" aria-live="polite"></span><button id="page-next" class="button" type="button" aria-controls="race-grid">Next →</button></nav>
       </section>
       <section class="reading-note" aria-labelledby="reading-title"><span aria-hidden="true">ⓘ</span><div><h2 id="reading-title">Read the count carefully</h2><p>Early returns can shift as counties and ballot types report. Precincts reporting do not equal the share of votes counted. Each embedded card labels its source and whether results are unofficial; a call is distinct from certification.</p><p>If a card is blank or blocked, use its “Open race at watch.vote” link. Source attribution remains inside every card.</p></div></section>
+      <section class="crashout-section" aria-labelledby="crashout-title">
+        <div class="section-heading"><div><h2 id="crashout-title">Crash-out watch</h2><p id="crashout-status" role="status">Opening social feeds…</p></div><button id="crashout-retry" class="button" type="button">Retry</button></div>
+        <p class="coverage-note">Live Bluesky accounts tracking Trump's Truth Social posts and election-night reaction. Truth Social blocks framing and public API reads, so his own posts appear as quoted by these feeds. Posts are reactions and opinions — not results, calls or odds.</p>
+        <p id="crashout-warning" class="map-warning" role="status" hidden></p>
+        <div id="crashout-feed" class="crashout-feed"><p class="call-empty">No posts loaded yet.</p></div>
+      </section>
       <noscript><p class="alert">JavaScript is needed for the race picker. Use the NPR, AP and official results links above for election coverage.</p></noscript>
     </main>
     <footer><span>Election Night · Independent results desk</span><span>Individual counts and calls: <a href="https://watch.vote/" target="_blank" rel="noopener noreferrer">watch.vote</a> and the sources named in each card · <a href="https://watch.vote/docs/embeds/for-publishers" target="_blank" rel="noopener noreferrer">Embed information</a></span></footer>
