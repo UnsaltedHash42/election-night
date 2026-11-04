@@ -26,6 +26,7 @@ let audioContext;
 const callTime = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' });
 try { $('alerts-key').checked = localStorage.getItem('election-night-key-alerts') !== 'off'; } catch {}
 const callMonitor = new window.CallMonitor({ onChange:renderCalls, onAlert:announceCall });
+let electionMap;
 
 try {
   const saved = localStorage.getItem(storageKeys.home);
@@ -166,10 +167,11 @@ function matchingRaces() {
   const state = $('state-filter').value;
   const office = $('office-filter').value;
   const query = $('search').value.trim().toLowerCase();
+  const exactRace = query && races.find(race => race.name.toLowerCase() === query);
   const ranks = { Senate:0, Governor:1, House:2, Delegate:3 };
   return races.filter((race) => (!state || race.state === state) && (!office || race.office === office)
     && (view !== 'pinned' || pins.has(race.id)) && (view !== 'key' || race.featured || (homeState && race.state === homeState))
-    && (!query || `${race.name} ${race.state} ${stateNames[race.state]} ${race.office}`.toLowerCase().includes(query)))
+    && (!query || (exactRace ? race.id === exactRace.id : `${race.name} ${race.state} ${stateNames[race.state]} ${race.office}`.toLowerCase().includes(query))))
     .sort((a, b) => Number(pins.has(b.id)) - Number(pins.has(a.id)) || ranks[a.office] - ranks[b.office]
       || a.state.localeCompare(b.state) || a.name.localeCompare(b.name, undefined, { numeric:true }));
 }
@@ -232,6 +234,15 @@ async function loadDirectory() {
       || !Object.hasOwn(stateNames, row.state) || !offices.includes(row.office) || typeof row.name !== 'string')
       || new Set(rows.map((row) => row.id)).size !== rows.length) throw new Error('Invalid race directory');
     races = rows;
+    if (!electionMap) electionMap = new window.ElectionMap({ stateNames, homeState, onExplore:({ raceId }) => {
+      const race = races.find(item => item.id === raceId);
+      if (!race) return;
+      $('state-filter').value = race.state; $('office-filter').value = race.office; $('search').value = race.name;
+      view = 'all'; page = 0; render();
+      $('race-desk').scrollIntoView({ block:'start' });
+      $('race-title').focus({ preventScroll:true });
+    } });
+    electionMap.setRaces(races);
     updateMonitoredRaces();
     $('directory-error').hidden = true;
     render();

@@ -4,7 +4,9 @@
 
 Election-night dashboard for November 3, 2026. Run locally at **http://127.0.0.1:8767** with Python 3.9 or newer.
 
-The public Cloudflare edition is in `public/`: adjustable home state, a saved watchlist, permitted race embeds, and call alerts for saved and national key races. NPR/AP links cover national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.
+The public Cloudflare edition has an interactive Senate, House and governor map, adjustable home state, a saved watchlist, permitted race embeds, and call alerts for saved and national key races. The map uses watch.vote's documented election API through a cached Pages function; the rest of the interface is in `public/`. NPR/AP links cover national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.
+
+The map refreshes about every minute while visible. Solid party fills mark explicit calls; hatched fills mark reported leads, and missing results stay gray. Select a state or House district for candidates, vote shares and the source, then open its race card in the desk. The state picker zooms into small districts. Map totals cover only 2026 races in this feed, not the full membership of Congress. [Map sources and build instructions](MAP_SOURCES.md) document the Census geometry.
 
 Public call alerts run while the page is open and visible; sound starts only after clicking Enable sound. A race's first check records its current status without alerting. Later explicit calls or corrections appear with their source and detection time. Call history survives reloads within the same tab; separate tabs keep separate histories. Leads never trigger alerts. Calls depend on what watch.vote publishes and may lag other outlets; this is not a complete national call feed or closed-tab push service.
 
@@ -46,6 +48,7 @@ Public source metadata and the last 60 changed count snapshots per race are kept
 python3 -m unittest test_feeds.py
 python3 -m unittest test_public.py
 node --test test_call_alerts.cjs
+node --test test_map_api.cjs test_map_ui.cjs test_map_client.cjs
 node test_public_ui.cjs
 python3 -m py_compile feeds.py server.py start.py
 node --check static/app.js

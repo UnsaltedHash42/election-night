@@ -1,6 +1,10 @@
 # Public edition
 
-Only `public/` goes to Cloudflare Pages. It contains a race directory, watch.vote's permitted embeds, and a browser call monitor using that provider's public widget JSON. It does not run the personal Python service, read its cache, copy NPR/AP results, calculate national control, or count flips. National control and party changes link to NPR/AP. The provider identifies the source, freshness and call status within each race card.
+Wrangler deploys `public/` and compiles the single Pages function at `functions/api/map-results.js`. The public edition contains a race directory, a geographic election map, watch.vote's permitted embeds, and a browser call monitor using that provider's public widget JSON. It does not run the personal Python service, read its cache, copy NPR/AP results, calculate full national control, or count flips. National control and party changes link to NPR/AP. The provider identifies the source, freshness and call status within each race card.
+
+The map calls `/api/map-results?office=senate|house|governors`. This function reads watch.vote's documented bulk results API, checks its election and result fields, and caches successful responses for 60 seconds. It accepts only those three office values; it cannot proxy arbitrary URLs. No credentials or database are needed. `_routes.json` limits function execution to this endpoint, leaving static assets and private-path 404s outside it. The browser refreshes the active office about once per minute while visible; a failed refresh retains the last successful map and shows a warning. Upstream rate limits delay retries.
+
+State and House district paths are bundled as static geometry, with no map tiles or browser map dependency. See [map sources](MAP_SOURCES.md) for the 2026 district snapshot, background state boundaries, build steps and licenses. The map distinguishes explicit calls, reported leads, tied votes, missing data and states without a race; named candidates without positive vote shares do not become leads. It displays source check times and flags checks over ten minutes old. AP's public page is linked rather than framed; its [terms](https://apnews.com/termsofservice) require permission for framing.
 
 Home state and watchlist choices stay in the visitor's browser. A shared `?state=AR` link sets an initial home state. No address or browser location permission is needed. Each page loads at most six race cards; their provider controls result updates.
 
@@ -13,6 +17,7 @@ Only explicit `called` or `certified` states with exactly one winner qualify. Ne
 ```sh
 python3 -m unittest test_feeds.py test_public.py
 node --test test_call_alerts.cjs
+node --test test_map_api.cjs test_map_ui.cjs test_map_client.cjs
 node test_public_ui.cjs
 node --check public/app.js
 npx wrangler@4.157.0 pages dev public --port 8788

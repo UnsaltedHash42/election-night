@@ -13,6 +13,11 @@ class Element {
   scrollIntoView() {}
 }
 let monitor;
+let map;
+class ElectionMap {
+  constructor(options) { map=this; this.options=options; }
+  setRaces(rows) { this.rows=rows; }
+}
 class CallMonitor {
   constructor(callbacks) { monitor=this; this.callbacks=callbacks; this.rows=[]; this.paused=false; }
   getSnapshot() { return {paused:this.paused,backoffUntil:0,total:this.rows.length,checkedCount:0,errorCount:0,lastCheckedAt:null,calls:[],events:[]}; }
@@ -32,7 +37,7 @@ ids.get('alerts-key').checked=true;
 const context={CallMonitor,document,location,URL,URLSearchParams,AbortSignal,Set,Map,Number,JSON,Object,console,setTimeout,clearTimeout,
   localStorage:{getItem:key=>local.get(key),setItem:(key,value)=>local.set(key,value)},
   history:{replaceState:(_,__,url)=>{location.href=String(url);location.search=new URL(url).search;}},
-  window:{CallMonitor,addEventListener:(name,callback)=>messages[name]=callback},
+  window:{CallMonitor,ElectionMap,addEventListener:(name,callback)=>messages[name]=callback},
   Option:function(text,value){const node=new Element('option');node.textContent=text;node.value=value;return node;},
   fetch:async()=>({ok:true,json:async()=>rows})};
 vm.createContext(context);
@@ -42,6 +47,7 @@ const frames=()=>ids.get('race-grid').querySelectorAll('iframe');
 (async()=>{
   await new Promise(setImmediate);
   assert.equal(monitor.rows.length,9,'Featured races must be monitored without pinning');
+  assert.equal(map.rows.length,9,'Map must receive the race directory');
   assert.equal(frames().length,6);
   const first=frames()[0];run('render()');assert.equal(frames()[0],first,'Unchanged rendering reloads frames');
   assert.equal(ids.get('home-state').children.length,51);
@@ -94,6 +100,12 @@ const frames=()=>ids.get('race-grid').querySelectorAll('iframe');
   const correction={...event,type:'correction',callState:'not-called',winner:null};
   monitor.callbacks.onChange({...monitor.getSnapshot(),events:[correction,event]});
   assert.equal(ids.get('call-events').querySelectorAll('article').length,1,'Superseded winner must not remain as a current alert');
+  rows.push({...rows[0],id:'race-10',slug:'ar-house-10',name:rows[0].name+'0'});
+  map.options.onExplore({raceId:rows[0].id});
+  assert.equal(ids.get('state-filter').value,'AR');
+  assert.equal(ids.get('office-filter').value,'House');
+  assert.equal(ids.get('search').value,rows[0].name);
+  assert.equal(frames().length,1,'Map selection must open the chosen race');
   console.log('PASS: key/saved-race monitor selection, pause/resume, call announcement, correction replacement.');
   console.log('PASS: directory network/schema/JSON failures and Retry recovery.');
   console.log('PASS: six-frame cap, stable frames, all state options, home persistence, filter clearing, pins, pages, iframe resize origin/source/height checks, and local link visibility.');

@@ -8,6 +8,7 @@
   <title>Election Night · November 3, 2026</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/call-alerts.js" defer></script>
+  <script src="/map.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -23,13 +24,28 @@
         <h1 id="page-title">Follow election night.</h1>
         <p class="intro-copy">National control, key races, and results close to home.</p>
       </section>
+      <section class="map-section" aria-labelledby="map-title">
+        <div class="section-heading"><div><h2 id="map-title">The election map</h2><p id="map-status" role="status">Opening the map…</p></div><div class="map-offices" role="group" aria-label="Map office"><button id="map-senate" class="button" type="button" aria-pressed="true">Senate</button><button id="map-house" class="button" type="button" aria-pressed="false">House</button><button id="map-governors" class="button" type="button" aria-pressed="false">Governor</button></div></div>
+        <div class="map-filters"><label>Zoom to state<select id="map-state"><option value="">All states</option></select></label><label>Find a race<select id="map-race"><option value="">Choose a race</option></select></label><button id="map-reset" class="button" type="button">Reset map</button></div>
+        <p id="map-error" class="map-warning" role="status" hidden></p>
+        <div class="map-layout"><div class="map-canvas"><svg id="election-map" viewBox="0 0 960 620" aria-label="Interactive 2026 election map">
+          <defs>
+            <pattern id="map-leading-dem" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#1d3a58"/><path d="M-1 1L1-1M0 6L6 0M5 7L7 5" stroke="#7ebafa" stroke-width="2"/></pattern>
+            <pattern id="map-leading-rep" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#493a20"/><path d="M-1 1L1-1M0 6L6 0M5 7L7 5" stroke="#e9b35c" stroke-width="2"/></pattern>
+            <pattern id="map-leading-other" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#382f4e"/><path d="M-1 1L1-1M0 6L6 0M5 7L7 5" stroke="#c3a3f0" stroke-width="2"/></pattern>
+          </defs><g id="map-regions"></g><g id="map-labels" aria-hidden="true"></g></svg>
+          <div class="map-legend" aria-label="Map legend"><span><i class="dem"></i>D · Democratic</span><span><i class="rep"></i>R · Republican</span><span><i class="other"></i>Other / unknown party</span><span>✓ Solid: called</span><span>▧ Hatched: leading, not called</span><span>— Gray: no result / no race</span></div>
+        </div><aside id="map-detail" class="map-detail" aria-label="Selected map race"><h3>Select a state or district</h3><p>Choose a race to inspect its result and source.</p></aside></div>
+        <div class="map-footer"><p>Results: <a href="https://watch.vote/midterms/2026" target="_blank" rel="noopener noreferrer">watch.vote</a> and the officials named in each race; coverage may lag AP. Refreshes about every minute while visible. Alaska and Hawaii are insets; use the state picker for small districts.</p><button id="map-retry" class="button" type="button">Retry</button></div>
+        <p class="map-footnote">This map covers races on the 2026 ballot, not seats held over from earlier elections. Missing data stays gray; a lead is never a call. House boundaries: <a href="https://watch.vote/docs/api-reference/elections" target="_blank" rel="noopener noreferrer">2026 Census snapshot via watch.vote</a>.</p>
+      </section>
       <section class="national-section" aria-labelledby="national-title">
         <div class="section-heading"><div><h2 id="national-title">The national picture</h2><p>Full national tallies and called party changes are on NPR and AP.</p></div></div>
         <div class="national-grid">
           <article class="national-card"><span class="eyebrow">HOUSE & SENATE</span><h3>Who will control Congress?</h3><p>Follow the national seat count and race calls.</p><a class="source-button" href="https://apps.npr.org/2026-election-results/" target="_blank" rel="noopener noreferrer">Open NPR national results <span aria-hidden="true">↗</span></a></article>
           <article class="national-card"><span class="eyebrow amber">SEATS & GOVERNORSHIPS</span><h3>Which races change hands?</h3><p>Follow AP’s national coverage for called winners and party changes.</p><a class="source-button" href="https://apnews.com/projects/elections-2026/" target="_blank" rel="noopener noreferrer">Open AP election results <span aria-hidden="true">↗</span></a></article>
         </div>
-        <p class="national-note">This page embeds individual race results; it does not calculate national control or a national flip tally. <a href="https://votes.decisiondeskhq.com/" target="_blank" rel="noopener noreferrer">Decision Desk HQ coverage ↗</a></p>
+        <p class="national-note">The map shows 2026 races; national control and party changes are tracked by these outlets. <a href="https://votes.decisiondeskhq.com/" target="_blank" rel="noopener noreferrer">Decision Desk HQ coverage ↗</a></p>
       </section>
       <section class="call-section" aria-labelledby="calls-title">
         <div class="section-heading"><div><h2 id="calls-title">Call alerts</h2><p id="calls-status" role="status">Opening the call monitor…</p></div><div class="call-controls"><button id="alerts-pause" class="button" type="button" aria-pressed="false">Pause alerts</button><button id="alerts-sound" class="button" type="button" aria-pressed="false">Enable sound</button></div></div>
@@ -49,7 +65,7 @@
         <div class="link-row"><a href="https://arkansas.tally-enr.com/" target="_blank" rel="noopener noreferrer">Arkansas official results ↗</a><a href="https://votes.decisiondeskhq.com/elections/2026-11-03/arkansas/pulaski" target="_blank" rel="noopener noreferrer">Sherwood / Pulaski races ↗</a><a href="https://votepulaskiar.gov/election-results/" target="_blank" rel="noopener noreferrer">Pulaski County official results ↗</a></div>
       </section>
       <section id="race-desk" class="race-section" aria-labelledby="race-title">
-        <div class="section-heading"><div><h2 id="race-title">Your race desk</h2><p id="results-count" role="status">Loading the race directory…</p></div><div class="view-switch" role="group" aria-label="Race view"><button id="view-key" class="active" type="button" aria-pressed="true">Key races</button><button id="view-all" type="button" aria-pressed="false">All races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
+        <div class="section-heading"><div><h2 id="race-title" tabindex="-1">Your race desk</h2><p id="results-count" role="status">Loading the race directory…</p></div><div class="view-switch" role="group" aria-label="Race view"><button id="view-key" class="active" type="button" aria-pressed="true">Key races</button><button id="view-all" type="button" aria-pressed="false">All races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
         <div class="filters"><label class="search-label"><span class="sr-only">Search race names or states</span><input id="search" type="search" placeholder="Find a race or state" autocomplete="off"></label><label><span class="sr-only">Filter by state</span><select id="state-filter"><option value="">All states</option></select></label><label><span class="sr-only">Filter by office</span><select id="office-filter"><option value="">All offices</option><option>Senate</option><option>House</option><option>Governor</option><option>Delegate</option></select></label></div>
         <p class="coverage-note">Counts, call status, source and update time appear inside each watch.vote card. Cards update through the provider when results are available; a reported lead is not a call. Reload for fresh counts if reduced motion or reduced data is enabled.</p>
         <div id="directory-error" class="alert" role="alert" hidden><p>The race directory could not be loaded. National coverage links remain available above.</p><button id="retry" class="button" type="button">Try again</button></div>

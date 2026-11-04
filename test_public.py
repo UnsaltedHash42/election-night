@@ -25,7 +25,8 @@ class PublicEditionTests(unittest.TestCase):
         config = json.loads((ROOT / 'wrangler.jsonc').read_text())
         directory = (ROOT / config['pages_build_output_dir']).resolve()
         self.assertEqual(directory, ROOT / 'public')
-        allowed = {'index.html', 'app.js', 'call-alerts.js', 'styles.css', 'races.json', '_headers', '404.html'}
+        allowed = {'index.html', 'app.js', 'call-alerts.js', 'map.js', 'map-shapes.json',
+                   'styles.css', 'races.json', '_headers', '_routes.json', '404.html'}
         self.assertTrue({p.name for p in directory.iterdir()}.issubset(allowed))
         self.assertFalse(any(p.is_symlink() for p in directory.iterdir()))
 
@@ -35,7 +36,24 @@ class PublicEditionTests(unittest.TestCase):
         self.assertNotIn('127.0.0.1', source)
         self.assertNotIn('apps.npr.org/2026-election-results/data', source)
         self.assertIn('https://watch.vote', source)
-        self.assertEqual(set(re.findall(r'https?://[^/\s\'"`]+', source)), {'https://watch.vote'})
+        self.assertEqual(set(re.findall(r'https?://[^/\s\'"`]+', source.replace('http://www.w3.org/2000/svg', ''))), {'https://watch.vote'})
+
+    def test_map_shapes_match_the_race_directory(self):
+        shapes = json.loads((ROOT / 'public/map-shapes.json').read_text())
+        races = json.loads((ROOT / 'public/races.json').read_text())
+        self.assertEqual((shapes['width'], shapes['height']), (960, 620))
+        self.assertEqual({r['state'] for r in races}, {s['id'] for s in shapes['states']})
+        self.assertEqual({r['id'] for r in races if r['office'] in ('House', 'Delegate')},
+                         {s['id'] for s in shapes['districts']})
+        self.assertEqual(len(shapes['districts']), 436)
+        self.assertEqual(len(shapes['states']), 51)
+        for shape in shapes['states'] + shapes['districts']:
+            self.assertTrue(shape['path'].startswith('M'))
+            self.assertNotRegex(shape['path'], 'NaN|Infinity')
+            self.assertLess(shape['bounds'][0][0], shape['bounds'][1][0])
+            self.assertLess(shape['bounds'][0][1], shape['bounds'][1][1])
+        routes = json.loads((ROOT / 'public/_routes.json').read_text())
+        self.assertEqual(routes['include'], ['/api/map-results'])
 
 
 if __name__ == '__main__':
