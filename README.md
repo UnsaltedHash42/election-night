@@ -4,7 +4,7 @@
 
 Election-night dashboard for November 3, 2026. Run locally at **http://127.0.0.1:8767** with Python 3.9 or newer.
 
-The public Cloudflare edition has an interactive Senate, House and governor map, adjustable home state, a saved watchlist, permitted race embeds, and call alerts for saved and national key races. The map uses watch.vote's documented election API through a cached Pages function; the rest of the interface is in `public/`. NPR/AP links cover national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.
+The public Cloudflare edition has an interactive Senate, House and governor map, adjustable home state, a saved watchlist, permitted race embeds, Polymarket odds, Decision Desk HQ's framed forecast, and call alerts for saved and national key races. The map uses watch.vote's documented election API through a cached Pages function; the rest of the interface is in `public/`. NPR/AP links cover national control and flips. See [deployment instructions](DEPLOYMENT.md). It is separate from the personal data service below.
 
 The map refreshes about every minute while visible. Solid party fills mark explicit calls; hatched fills mark reported leads, and missing results stay gray. Select a state or House district for candidates, vote shares and the source, then open its race card in the desk. The state picker zooms into small districts. Map totals cover only 2026 races in this feed, not the full membership of Congress. [Map sources and build instructions](MAP_SOURCES.md) document the Census geometry.
 

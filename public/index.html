@@ -10,6 +10,7 @@
   <script src="/call-alerts.js" defer></script>
   <script src="/map.js" defer></script>
   <script src="/markets.js" defer></script>
+  <script src="/forecast.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -61,6 +62,11 @@
           </select><iframe id="market-race-frame" title="Polymarket: Democratic victory in Texas Senate" loading="lazy" src="https://embed.polymarket.com/market?market=will-the-democrats-win-the-texas-senate-race-in-2026&amp;theme=dark&amp;buttons=false&amp;fit=true&amp;height=400"></iframe><a id="market-race-link" href="https://polymarket.com/event/texas-senate-election-winner" target="_blank" rel="noopener noreferrer">Open Texas Senate market ↗</a></article>
         </div>
         <p id="markets-status" class="coverage-note" role="status">Widgets supplied by Polymarket. Each question defines Yes and No; “No” does not necessarily mean Republican. Use Refresh odds or the source links if a widget stalls.</p>
+      </section>
+      <section class="market-section" aria-labelledby="forecast-title">
+        <div class="section-heading"><div><h2 id="forecast-title">What the decision desk projects</h2><p>Decision Desk HQ forecast · A model projection, not vote counts or race calls.</p></div><button id="forecast-refresh" class="button" type="button">Refresh forecast</button></div>
+        <article class="market-card forecast-card"><h3>2026 House and Senate forecast</h3><iframe id="forecast-frame" title="Decision Desk HQ 2026 forecast" loading="lazy" src="https://votes.decisiondeskhq.com/forecast/2026"></iframe><div class="forecast-links"><a href="https://votes.decisiondeskhq.com/forecast/2026" target="_blank" rel="noopener noreferrer">Open the DDHQ forecast <span aria-hidden="true">↗</span></a><a href="https://votes-docs.decisiondeskhq.com/forecast-methodology" target="_blank" rel="noopener noreferrer">How the model works <span aria-hidden="true">↗</span></a></div></article>
+        <p id="forecast-status" class="coverage-note" role="status">Decision Desk HQ's live forecast page, embedded whole with its own branding and update times. The frame reloads every five minutes while visible. Probabilities and seat projections are model estimates, separate from vote counts, race calls and market odds.</p>
       </section>
       <section class="call-section" aria-labelledby="calls-title">
         <div class="section-heading"><div><h2 id="calls-title">Call alerts</h2><p id="calls-status" role="status">Opening the call monitor…</p></div><div class="call-controls"><button id="alerts-pause" class="button" type="button" aria-pressed="false">Pause alerts</button><button id="alerts-sound" class="button" type="button" aria-pressed="false">Enable sound</button></div></div>
