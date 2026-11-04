@@ -207,7 +207,7 @@ test('a contradicting AP count marks the race disputed without replacing it', as
   ]});
   const env = setup(request => response(payload('senate', 'Known leader')), undefined, npr);
   await env.flush();
-  assert.match(env.el('map-status').textContent, /1 race where AP and this feed disagree/);
+  assert.match(env.el('map-status').textContent, /1 race where AP and watch.vote disagree/);
   assert.match(env.el('map-detail').textContent, /⚠ Sources disagree/);
   assert.match(env.el('map-detail').textContent, /Rival Leader/);
   assert.match(env.el('map-detail').textContent, /Known leader/);
@@ -233,4 +233,58 @@ test('a key race shows its live market price beside the count', async() => {
   env.el('map-race').listeners.change();
   await env.flush();
   assert.doesNotMatch(env.el('map-detail').textContent, /Polymarket price/);
+});
+
+test('races watch.vote lacks are filled from AP, labeled, and never override its rows', async() => {
+  const empty = { ...payload('senate', 'Known leader'), rows:[
+    { raceId:'2026-ar-senate', result:null, official:{ authority:'Arkansas Secretary of State', url:'https://example.com/ar', read:false } },
+    ...payload('senate', 'Known leader').rows.filter(row => row.raceId === '2026-ga-senate')
+  ] };
+  const npr = () => response({ results:[
+    { test:false, state:'AR', office:'S', type:'General', eevp:0.678,
+      candidates:[{ id:1, first:'Cindy', last:'Hyde', party:'GOP', votes:321723 }, { id:2, first:'Scott', last:'Colom', party:'Dem', votes:307810 }, { id:3, last:'Other', party:'Other', votes:467 }] },
+    { test:false, state:'GA', office:'S', type:'General',
+      candidates:[{ id:5, first:'AP', last:'Override', party:'Dem', votes:999 }] }
+  ]});
+  const env = setup(() => response(empty), undefined, npr);
+  await env.flush();
+  assert.match(env.el('map-status').textContent, /2 races with results \(1 from AP via NPR where watch.vote has none\) · 0 called/);
+  const detail = env.el('map-detail').textContent;
+  assert.match(detail, /Leading: Cindy Hyde \(Republican\) · Not called/);
+  assert.match(detail, /Cindy Hyde · Republican · 51\.1%/);
+  assert.match(detail, /Scott Colom · Democratic · 48\.9%/);
+  assert.match(detail, /67\.8% of expected vote counted/);
+  assert.match(detail, /watch.vote has no result for this race yet/);
+  assert.match(detail, /AP via NPR/);
+  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /leading rep/);
+  assert.doesNotMatch(env.map.nodes.get('AR').path.getAttribute('class'), /disputed/);
+  env.el('map-race').value = 'ga-senate';
+  env.el('map-race').listeners.change();
+  await env.flush();
+  assert.match(env.el('map-detail').textContent, /Known leader/);
+  assert.doesNotMatch(env.el('map-detail').textContent, /watch.vote has no result/);
+});
+
+test('an AP call replaces an uncalled watch.vote row but never a watch.vote call', async() => {
+  const rows = payload('senate', 'Known leader').rows;
+  const calledGa = { ...rows.find(row => row.raceId === '2026-ga-senate') };
+  calledGa.result = { ...calledGa.result, call:'called', winner:'lead', winnerName:'Known leader', winnerParty:'Democratic' };
+  const data = { ...payload('senate', 'Known leader'), rows:[rows.find(row => row.raceId === '2026-ar-senate'), calledGa] };
+  const npr = () => response({ results:[
+    { test:false, state:'AR', office:'S', type:'General', eevp:0.9,
+      candidates:[{ id:1, first:'Known', last:'leader', party:'Dem', votes:900, winner:'X' }, { id:2, first:'Second', last:'candidate', party:'GOP', votes:600 }] },
+    { test:false, state:'GA', office:'S', type:'General',
+      candidates:[{ id:5, first:'Other', last:'Winner', party:'Dem', votes:9, winner:'X' }] }
+  ]});
+  const env = setup(() => response(data), undefined, npr);
+  await env.flush();
+  assert.match(env.el('map-status').textContent, /1 AP call watch.vote hasn’t made/);
+  assert.match(env.el('map-detail').textContent, /✓ Called: Known leader \(Democratic\)/);
+  assert.match(env.el('map-detail').textContent, /AP has called this race; watch.vote has not yet/);
+  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /called dem/);
+  env.el('map-race').value = 'ga-senate';
+  env.el('map-race').listeners.change();
+  await env.flush();
+  assert.match(env.el('map-detail').textContent, /✓ Called: Known leader/);
+  assert.doesNotMatch(env.el('map-detail').textContent, /AP has called this race/);
 });

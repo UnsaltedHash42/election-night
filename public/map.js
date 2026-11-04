@@ -46,22 +46,44 @@ function readNprRaces(data) {
       id = `${item.state.toLowerCase()}-house-${String(district).padStart(2, '0')}`;
     } else continue;
     const named = (item.candidates || []).filter(candidate => candidate.party !== 'Other' && (candidate.last || candidate.first));
-    const counted = named.filter(candidate => Number.isFinite(candidate.votes) && candidate.votes > 0);
+    const counted = named.filter(candidate => Number.isFinite(candidate.votes) && candidate.votes > 0).sort((a, b) => b.votes - a.votes);
     const winner = named.find(candidate => candidate.winner === 'X') || null;
     if (!winner && !counted.length) continue;
-    const leader = counted.length ? counted.reduce((best, candidate) => (candidate.votes > best.votes ? candidate : best)) : null;
+    const total = (item.candidates || []).reduce((sum, candidate) => sum + (Number.isFinite(candidate.votes) && candidate.votes > 0 ? candidate.votes : 0), 0);
     const name = candidate => `${candidate.first || ''} ${candidate.last || ''}`.trim();
+    const person = candidate => candidate ? { name:name(candidate), party:nprParty(candidate.party), partyName:nprPartyName(candidate.party),
+      share:total ? Math.round((candidate.votes / total) * 1000) / 10 : null } : null;
+    const leader = person(counted[0]);
     map.set(id, {
-      winner: winner ? { name:name(winner), party:nprParty(winner.party) } : null,
-      leader: leader ? { name:name(leader), party:nprParty(leader.party) } : null,
-      percent: leader && Number.isFinite(leader.percent) ? Math.round(leader.percent * 1000) / 10 : null
+      winner: person(winner),
+      leader,
+      second: person(counted[1]),
+      percent: leader?.share ?? null,
+      expected: Number.isFinite(item.eevp) && item.eevp >= 0 && item.eevp <= 1 ? Math.round(item.eevp * 1000) / 10 : null
     });
   }
   return map;
 }
 
+function nprPartyName(value) {
+  return { Dem:'Democratic', GOP:'Republican' }[value] || value || null;
+}
+
+function apRow(raceId, cross, checkedAt, reason = 'missing') {
+  const { winner, leader, second } = cross;
+  const place = !winner ? null : winner.name === leader?.name ? 'lead' : winner.name === second?.name ? 'second' : 'other';
+  return { raceId:`2026-${raceId}`, apFill:reason,
+    official:{ authority:'AP via NPR', url:'https://apps.npr.org/2026-election-results/', read:true },
+    result:{ raceId:`2026-${raceId}`, call:winner ? 'called' : 'not-called', calledBy:winner ? 'AP' : null, runoffOn:null,
+      sourceKind:'licensed', winner:place, winnerName:winner?.name || null, winnerParty:winner?.partyName || null,
+      leadName:leader?.name || null, leadParty:leader?.partyName || null, leadPercent:leader?.share ?? null,
+      secondName:second?.name || null, secondParty:second?.partyName || null, secondPercent:second?.share ?? null,
+      countedKind:cross.expected === null ? null : 'expected', countedPercent:cross.expected,
+      authority:'AP via NPR', fetchedAt:new Date(checkedAt).toISOString() } };
+}
+
 function crossConflict(row, status, cross) {
-  if (!cross) return null;
+  if (!cross || row?.apFill) return null;
   const label = party => ({ dem:'Democratic', rep:'Republican' })[party] || 'a third party';
   if (['called', 'certified'].includes(status.kind)) {
     if (cross.winner && cross.winner.party !== status.party)
@@ -234,13 +256,29 @@ window.ElectionMap = class ElectionMap {
     await Promise.all(reads);
   }
 
+  mergedRows() {
+    const rows = new Map((this.cache.get(this.office)?.payload.rows || []).map(row => [row.raceId.replace(/^2026-/, ''), row]));
+    const ids = new Set(this.officeRaces().map(race => race.id));
+    for (const [id, cross] of this.cross.byRace) {
+      if (!ids.has(id)) continue;
+      const existing = rows.get(id)?.result;
+      if (!existing) rows.set(id, apRow(id, cross, this.cross.checkedAt));
+      else if (cross.winner && !['called', 'certified'].includes(existing.call)) rows.set(id, apRow(id, cross, this.cross.checkedAt, 'call'));
+    }
+    return rows;
+  }
+
   renderStatus() {
     const saved = this.cache.get(this.office);
-    const rows = saved?.payload.rows || [];
+    const rows = [...this.mergedRows().values()].filter(row => row.result);
+    const filled = rows.filter(row => row.apFill === 'missing').length;
+    const apCalls = rows.filter(row => row.apFill === 'call').length;
+    const notes = [filled && `${filled} from AP via NPR where watch.vote has none`, apCalls && `${apCalls} AP ${apCalls === 1 ? 'call' : 'calls'} watch.vote hasn’t made`].filter(Boolean);
     const called = rows.filter(row => mapRaceStatus(row).kind === 'called').length;
     const disputed = rows.filter(row => crossConflict(row, mapRaceStatus(row), this.cross.byRace.get(row.raceId.replace(/^2026-/, '')))).length;
+    const checked = Math.max(saved?.checkedAt || 0, this.cross.checkedAt || 0);
     this.el('map-status').textContent = document.hidden ? 'Ⅱ Map checks paused in background'
-      : saved ? `${rows.filter(row => row.result).length} races with results · ${called} called in this feed${disputed ? ` · ⚠ ${disputed} ${disputed === 1 ? 'race where' : 'races where'} AP and this feed disagree` : ''} · Checked ${this.time.format(new Date(saved.checkedAt))}${this.loading ? ' · Updating…' : ''}`
+      : checked ? `${rows.length} races with results${notes.length ? ` (${notes.join('; ')})` : ''} · ${called} called${disputed ? ` · ⚠ ${disputed} ${disputed === 1 ? 'race where' : 'races where'} AP and watch.vote disagree` : ''} · Checked ${this.time.format(new Date(checked))}${this.loading ? ' · Updating…' : ''}`
       : this.loading ? 'Loading results…' : 'Waiting for results';
     this.el('map-error').hidden = !this.error;
     this.el('map-error').textContent = this.error || '';
@@ -256,7 +294,7 @@ window.ElectionMap = class ElectionMap {
       if (!raceByShape.has(key)) raceByShape.set(key, race);
     }
     if (!this.selectedRace && this.selectedState) this.selectedRace = officeRaces.find(race => race.state === this.selectedState)?.id || '';
-    const rows = new Map((this.cache.get(this.office)?.payload.rows || []).map(row => [row.raceId.replace(/^2026-/, ''), row]));
+    const rows = this.mergedRows();
     const shapes = (this.office === 'house' ? this.shapes.districts : this.shapes.states).filter(shape => !zoom || (shape.state || shape.id) === zoom);
     const signature = `${this.office}:${zoom}`;
     if (signature !== this.signature) {
@@ -322,6 +360,9 @@ window.ElectionMap = class ElectionMap {
     } else {
       const result = row?.result, status = mapRaceStatus(row);
       content.push(this.node('p', `map-outcome ${status.kind}`, status.text));
+      if (row?.apFill) content.push(this.node('p', 'map-ap-fill', row.apFill === 'call'
+        ? 'AP has called this race; watch.vote has not yet — showing AP’s call and counts via NPR.'
+        : 'watch.vote has no result for this race yet — showing AP counts and calls via NPR.'));
       const conflict = crossConflict(row, status, this.cross.byRace.get(race.id));
       if (conflict) {
         content.push(this.node('p', 'map-conflict', `⚠ Sources disagree — ${conflict}`));
