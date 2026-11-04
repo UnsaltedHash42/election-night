@@ -1,6 +1,6 @@
 # Public edition
 
-Polymarket's [official widgets](https://help.polymarket.com/en/articles/13364174-how-to-use-embeds) show House/Senate control odds and four selected Senate/governor markets. Three lazy-loaded frames preserve provider attribution, disable buy buttons, and offer source links and manual refresh. Their market prices never enter the map, calls or alert monitor. The provider owns widget updates; the dashboard does not invent an odds timestamp. CSP permits only the added `https://embed.polymarket.com` frame origin, with no extra parent-page API permission or credentials.
+Polymarket's [official widgets](https://help.polymarket.com/en/articles/13364174-how-to-use-embeds) show House/Senate control odds and four selected Senate/governor markets. Three lazy-loaded frames preserve provider attribution, disable buy buttons, and offer source links and manual refresh. The provider owns widget updates; the dashboard does not invent an odds timestamp. For the same four races, the map's detail panel shows the live "Yes" price from Polymarket's public, CORS-open market API (`gamma-api.polymarket.com`), read with each map refresh. The price is labeled as a market price, not a count, call or forecast, and never affects map colors, calls or alerts. A failed read keeps the last price.
 
 Decision Desk HQ's public forecast page is framed whole at its own URL with its branding, sign-in and update times intact. DDHQ's [terms](https://votes-docs.decisiondeskhq.com/terms-of-service) prohibit scraping and republishing its content; framing the live page displays it without copying, and no forecast numbers are read, stored or mixed into results, calls or odds. The frame reloads every five minutes while the tab is visible, and a manual refresh is offered. CSP adds only the `https://votes.decisiondeskhq.com` frame origin.
 
@@ -8,7 +8,9 @@ The crash-out watch reads four public Bluesky author feeds through [Bluesky's pu
 
 The map cross-checks every displayed race against AP's counts in [NPR's public results JSON](https://apps.npr.org/2026-election-results/), fetched by the browser each cycle. Displayed counts still come only from watch.vote; a disagreement (different leader, or AP calling a race this feed still shows uncalled) marks the shape with a dashed outline, a ⚠ comparison in the detail panel with both leaders, and a per-office count in the status line. Nothing is silently substituted. This exists because on election night watch.vote published a Texas Senate row showing Paxton leading by six while AP simultaneously showed Talarico ahead by eighteen; watch.vote corrected that row within minutes, and a later Arkansas Senate row repeated the pattern with zero precincts reporting.
 
-Wrangler deploys `public/` and compiles the single Pages function at `functions/api/map-results.js`. The public edition contains a race directory, a geographic election map, watch.vote's permitted embeds, and a browser call monitor using that provider's public widget JSON. It does not run the personal Python service, read its cache, substitute AP/NPR counts for displayed results, calculate full national control, or count flips. National control and party changes link to NPR/AP; AP counts via NPR serve only the cross-check described above. The provider identifies the source, freshness and call status within each race card.
+Wrangler deploys `public/` and compiles the single Pages function at `functions/api/map-results.js`. The public edition contains a race directory, a geographic election map, watch.vote's permitted embeds, and a browser call monitor using that provider's public widget JSON. It does not run the personal Python service, read its cache, substitute AP/NPR counts for displayed results, or count flips. AP counts via NPR serve the cross-check described above and the balance strip below. The provider identifies the source, freshness and call status within each race card.
+
+The balance-of-power strip counts AP race calls (a candidate's `winner: 'X'` marker) from NPR's public Senate, House and governor JSON once a minute while visible. Senate totals add NPR's fixed holdover baseline (Democratic caucus 34 including two independents, Republicans 31). Governor bars count only tonight's 36 races. D.C.'s delegate is excluded from the House. Leads and forecasts never enter the bars, and a failed read keeps the last counts. On election night the strip matched an independent tally of the same feeds exactly, including Louisiana's nonpartisan House rows.
 
 The map calls `/api/map-results?office=senate|house|governors`. This function reads watch.vote's documented bulk results API, checks its election and result fields, and caches successful responses for 60 seconds. It accepts only those three office values; it cannot proxy arbitrary URLs. No credentials or database are needed. `_routes.json` limits function execution to this endpoint, leaving static assets and private-path 404s outside it. The browser refreshes the active office about once per minute while visible; a failed refresh retains the last successful map and shows a warning. Upstream rate limits delay retries.
 
@@ -24,7 +26,7 @@ Only explicit `called` or `certified` states with exactly one winner qualify. Ne
 
 ```sh
 python3 -m unittest test_feeds.py test_public.py
-node --test test_call_alerts.cjs
+node --test test_call_alerts.cjs test_markets.cjs test_forecast.cjs test_crashout.cjs test_balance.cjs
 node --test test_map_api.cjs test_map_ui.cjs test_map_client.cjs
 node test_public_ui.cjs
 node --check public/app.js

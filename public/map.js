@@ -41,20 +41,20 @@ function readNprRaces(data) {
     if (item.office === 'S' && item.type === 'General') id = `${item.state.toLowerCase()}-senate`;
     else if (item.office === 'G' && item.type === 'General') id = `${item.state.toLowerCase()}-governor`;
     else if (item.office === 'H' && ['General', 'Nonpartisan Election'].includes(item.type)) {
-      const district = ['AK', 'DE', 'ND', 'SD', 'VT', 'WY'].includes(item.state) ? 0 : item.seatNumber;
-      if (!Number.isInteger(district)) continue;
+      const district = ['AK', 'DE', 'ND', 'SD', 'VT', 'WY'].includes(item.state) ? 0 : Number(item.seatNumber);
+      if (!Number.isInteger(district) || district < 0 || String(item.seatNumber).trim() === '') continue;
       id = `${item.state.toLowerCase()}-house-${String(district).padStart(2, '0')}`;
     } else continue;
-    const candidates = (item.candidates || []).filter(candidate => candidate.party !== 'Other'
-      && Number.isFinite(candidate.votes) && candidate.votes > 0 && (candidate.last || candidate.first));
-    if (!candidates.length) continue;
-    const winner = item.winnerId != null ? candidates.find(candidate => String(candidate.id) === String(item.winnerId)) : null;
-    const leader = candidates.reduce((best, candidate) => (candidate.votes > best.votes ? candidate : best));
+    const named = (item.candidates || []).filter(candidate => candidate.party !== 'Other' && (candidate.last || candidate.first));
+    const counted = named.filter(candidate => Number.isFinite(candidate.votes) && candidate.votes > 0);
+    const winner = named.find(candidate => candidate.winner === 'X') || null;
+    if (!winner && !counted.length) continue;
+    const leader = counted.length ? counted.reduce((best, candidate) => (candidate.votes > best.votes ? candidate : best)) : null;
     const name = candidate => `${candidate.first || ''} ${candidate.last || ''}`.trim();
     map.set(id, {
       winner: winner ? { name:name(winner), party:nprParty(winner.party) } : null,
-      leader: { name:name(leader), party:nprParty(leader.party) },
-      percent: Number.isFinite(leader.percent) ? Math.round(leader.percent * 1000) / 10 : null
+      leader: leader ? { name:name(leader), party:nprParty(leader.party) } : null,
+      percent: leader && Number.isFinite(leader.percent) ? Math.round(leader.percent * 1000) / 10 : null
     });
   }
   return map;
@@ -76,6 +76,27 @@ function crossConflict(row, status, cross) {
   return null;
 }
 
+const oddsRaces = {
+  'tx-senate':{ slug:'will-the-democrats-win-the-texas-senate-race-in-2026', event:'texas-senate-election-winner' },
+  'me-senate':{ slug:'will-the-democrats-win-the-maine-senate-race-in-2026', event:'maine-senate-election-winner' },
+  'ga-governor':{ slug:'will-the-democrats-win-the-georgia-governor-race-in-2026', event:'georgia-governor-winner-2026' },
+  'mi-governor':{ slug:'will-the-democrats-win-the-michigan-governor-race-in-2026', event:'michigan-governor-winner-2026' }
+};
+
+function parseOddsMarket(data) {
+  const market = Array.isArray(data) ? data[0] : null;
+  if (!market || market.closed === true) return null;
+  let outcomes, prices;
+  try {
+    outcomes = typeof market.outcomes === 'string' ? JSON.parse(market.outcomes) : market.outcomes;
+    prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices;
+  } catch { return null; }
+  if (!Array.isArray(outcomes) || !Array.isArray(prices)) return null;
+  const index = outcomes.indexOf('Yes');
+  const yes = index >= 0 ? Number(prices[index]) : NaN;
+  return Number.isFinite(yes) && yes >= 0 && yes <= 1 ? { yes } : null;
+}
+
 window.ElectionMap = class ElectionMap {
   constructor({ stateNames, homeState, onExplore }) {
     this.names = stateNames;
@@ -86,6 +107,7 @@ window.ElectionMap = class ElectionMap {
     this.races = [];
     this.cache = new Map();
     this.cross = { byRace:new Map(), checkedAt:null };
+    this.odds = new Map();
     this.nodes = new Map();
     this.generation = 0;
     this.time = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' });
@@ -183,7 +205,7 @@ window.ElectionMap = class ElectionMap {
       clearTimeout(timeout);
       if (generation === this.generation) {
         this.loading = false;
-        await this.loadCross(office, generation);
+        await Promise.all([this.loadCross(office, generation), this.loadOdds(generation)]);
         this.render();
         if (!document.hidden) this.timer = setTimeout(() => this.refresh(), delay);
       }
@@ -198,6 +220,18 @@ window.ElectionMap = class ElectionMap {
       if (generation !== this.generation) return;
       this.cross = { byRace, checkedAt:Date.now() };
     } catch { /* the last successful cross-check stays in place */ }
+  }
+
+  async loadOdds(generation) {
+    const reads = Object.entries(oddsRaces).map(async ([raceId, market]) => {
+      try {
+        const response = await fetch(`https://gamma-api.polymarket.com/markets?slug=${market.slug}`, { signal:AbortSignal.timeout(15000) });
+        if (!response.ok) return;
+        const odds = parseOddsMarket(await response.json());
+        if (odds) this.odds.set(raceId, { ...odds, at:Date.now() });
+      } catch { /* the last successful price stays in place */ }
+    });
+    await Promise.all(reads);
   }
 
   renderStatus() {
@@ -295,6 +329,14 @@ window.ElectionMap = class ElectionMap {
         compare.href = 'https://apps.npr.org/2026-election-results/';
         compare.target = '_blank'; compare.rel = 'noopener noreferrer';
         content.push(compare);
+      }
+      const odds = this.odds.get(race.id);
+      if (odds) {
+        content.push(this.node('p', 'map-odds', `Polymarket price: Democratic win ${Math.round(odds.yes * 100)}¢ · a market price, not a count, call or forecast`));
+        const market = this.node('a', '', 'Open Polymarket market ↗');
+        market.href = `https://polymarket.com/event/${oddsRaces[race.id].event}`;
+        market.target = '_blank'; market.rel = 'noopener noreferrer';
+        content.push(market);
       }
       for (const prefix of ['lead', 'second']) {
         if (result?.[`${prefix}Name`]) content.push(this.node('p', 'map-candidate',

@@ -25,7 +25,7 @@ class PublicEditionTests(unittest.TestCase):
         config = json.loads((ROOT / 'wrangler.jsonc').read_text())
         directory = (ROOT / config['pages_build_output_dir']).resolve()
         self.assertEqual(directory, ROOT / 'public')
-        allowed = {'index.html', 'app.js', 'call-alerts.js', 'map.js', 'map-shapes.json', 'markets.js', 'forecast.js', 'crashout.js',
+        allowed = {'index.html', 'app.js', 'call-alerts.js', 'map.js', 'map-shapes.json', 'markets.js', 'forecast.js', 'crashout.js', 'balance.js',
                    'styles.css', 'races.json', '_headers', '_routes.json', '404.html'}
         self.assertTrue({p.name for p in directory.iterdir()}.issubset(allowed))
         self.assertFalse(any(p.is_symlink() for p in directory.iterdir()))
@@ -37,7 +37,8 @@ class PublicEditionTests(unittest.TestCase):
         self.assertIn('https://watch.vote', source)
         self.assertEqual(set(re.findall(r'https?://[^/\s\'"`]+', source.replace('http://www.w3.org/2000/svg', ''))),
                          {'https://watch.vote', 'https://embed.polymarket.com', 'https://polymarket.com',
-                          'https://public.api.bsky.app', 'https://bsky.app', 'https://apps.npr.org'})
+                          'https://public.api.bsky.app', 'https://bsky.app', 'https://apps.npr.org',
+                          'https://gamma-api.polymarket.com'})
 
     def test_map_shapes_match_the_race_directory(self):
         shapes = json.loads((ROOT / 'public/map-shapes.json').read_text())

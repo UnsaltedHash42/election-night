@@ -45,7 +45,7 @@ test('old source checks stay marked and percentages never imply certification', 
 test('NPR rows normalize to race ids with leaders, winners and shares intact', () => {
   const env = context();
   const rows = env.readNprRaces({ results:[
-    { test:false, state:'TX', office:'S', type:'General', winnerId:null,
+    { test:false, state:'TX', office:'S', type:'General', winnerId:1,
       candidates:[
         { id:1, first:'James', last:'Talarico', party:'Dem', votes:2519629, percent:0.5815 },
         { id:2, first:'Ken', last:'Paxton', party:'GOP', votes:1746623, percent:0.4031 },
@@ -58,10 +58,19 @@ test('NPR rows normalize to race ids with leaders, winners and shares intact', (
       candidates:[{ id:9, first:'A', last:'B', party:'Dem', votes:5 }] },
     { test:false, state:'ZZZ', office:'S', type:'General',
       candidates:[{ id:9, first:'A', last:'B', party:'Dem', votes:5 }] },
-    { test:false, state:'GA', office:'S', type:'General', winnerId:1,
-      candidates:[{ id:1, first:'W', last:'Inner', party:'Dem', votes:9 }, { id:2, first:'X', last:'Outer', party:'GOP', votes:4 }] }
+    { test:false, state:'GA', office:'S', type:'General',
+      candidates:[{ id:1, first:'W', last:'Inner', party:'Dem', votes:9, winner:'X' }, { id:2, first:'X', last:'Outer', party:'GOP', votes:4, winner:'' }] },
+    { test:false, state:'CA', office:'H', type:'General', seatNumber:'12',
+      candidates:[{ id:7, first:'Una', last:'Opposed', party:'Dem', votes:0, winner:'X' }] },
+    { test:false, state:'NY', office:'H', type:'General', seatNumber:'',
+      candidates:[{ id:8, first:'No', last:'Seat', party:'Dem', votes:5 }] },
+    { test:false, state:'OH', office:'H', type:'General', seatNumber:'3',
+      candidates:[{ id:9, first:'Zero', last:'Votes', party:'Dem', votes:0 }] }
   ]});
-  assert.equal(rows.size, 3);
+  assert.equal(rows.size, 4);
+  const uncontested = rows.get('ca-house-12');
+  assert.equal(uncontested.winner.name, 'Una Opposed');
+  assert.equal(uncontested.leader, null);
   const tx = rows.get('tx-senate');
   assert.equal(tx.leader.name, 'James Talarico');
   assert.equal(tx.leader.party, 'dem');
@@ -86,4 +95,18 @@ test('provider conflicts are flagged without trusting either side', () => {
   const called = env.mapRaceStatus({ result:{ ...result, call:'called', winner:'lead', winnerName:'Ken Paxton', winnerParty:'Republican' } });
   assert.match(env.crossConflict({ result:{} }, called, calledByAp), /AP via NPR shows James Talarico \(Democratic\) as the winner/);
   assert.equal(env.crossConflict(lead, status, null), null);
+});
+
+test('market prices parse only live Yes/No books', () => {
+  const env = context();
+  const live = env.parseOddsMarket([{ outcomes:'["Yes", "No"]', outcomePrices:'["0.9935", "0.0065"]', closed:false }]);
+  assert.equal(live.yes, 0.9935);
+  assert.equal(env.parseOddsMarket([{ outcomes:'not json', outcomePrices:'["0.5"]' }]), null);
+  const flipped = env.parseOddsMarket([{ outcomes:['No', 'Yes'], outcomePrices:['0.4', '0.6'], closed:false }]);
+  assert.equal(flipped.yes, 0.6);
+  assert.equal(env.parseOddsMarket([{ outcomes:['Yes', 'No'], outcomePrices:['0.61', '0.39'], closed:true }]), null);
+  assert.equal(env.parseOddsMarket([{ outcomes:['Maybe'], outcomePrices:['0.5'] }]), null);
+  assert.equal(env.parseOddsMarket([{ outcomes:['Yes', 'No'], outcomePrices:['bogus', '0.2'] }]), null);
+  assert.equal(env.parseOddsMarket([]), null);
+  assert.equal(env.parseOddsMarket('x'), null);
 });
