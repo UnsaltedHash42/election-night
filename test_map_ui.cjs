@@ -4,8 +4,10 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 function context() {
-  const env = { window:{}, Date, Number, Map, Set, URL, console };
+  const env = { window:{}, Date, Number, Map, Set, URL, console, AbortSignal, setTimeout() {}, clearTimeout() {},
+    document:{ hidden:true, addEventListener() {} }, fetch:async () => ({ ok:false }) };
   vm.createContext(env);
+  vm.runInContext(fs.readFileSync('public/ap.js', 'utf8'), env);
   vm.runInContext(fs.readFileSync('public/map.js', 'utf8'), env);
   return env;
 }
@@ -81,20 +83,22 @@ test('NPR rows normalize to race ids with leaders, winners and shares intact', (
   assert.throws(() => env.readNprRaces({}), /Invalid NPR/);
 });
 
-test('provider conflicts are flagged without trusting either side', () => {
+test('watch.vote disagreements with AP are flagged; agreement and missing data are not', () => {
   const env = context();
-  const lead = { result:{ ...result, leadName:'Ken Paxton', leadParty:'Republican', leadPercent:52, secondPercent:46.1 } };
-  const status = env.mapRaceStatus(lead);
-  const conflict = env.crossConflict(lead, status, { winner:null, leader:{ name:'James Talarico', party:'dem' }, percent:58.2 });
-  assert.match(conflict, /AP via NPR currently shows James Talarico \(Democratic\) leading with 58\.2%/);
-  assert.equal(env.crossConflict(lead, status, { winner:null, leader:{ name:'Ken Paxton', party:'rep' } }), null);
-  const calledByAp = { winner:{ name:'James Talarico', party:'dem' }, leader:{ name:'James Talarico', party:'dem' } };
-  assert.match(env.crossConflict(lead, status, calledByAp), /already called this race for James Talarico/);
+  const watchLead = { result:{ ...result, leadName:'Ken Paxton', leadParty:'Republican', leadPercent:52, secondPercent:46.1 } };
+  const apLead = { winner:null, leader:{ name:'James Talarico', party:'dem', partyName:'Democratic', share:58.2 }, second:null, percent:58.2, expected:58 };
+  const row = env.apRow('tx-senate', apLead, Date.now(), watchLead);
+  assert.equal(env.mapRaceStatus(row).party, 'dem');
+  assert.match(env.providerConflict(row), /watch.vote shows Ken Paxton \(Republican\) leading with 52\.0%/);
+  const apRep = { ...apLead, leader:{ ...apLead.leader, party:'rep' } };
+  assert.equal(env.providerConflict(env.apRow('tx-senate', apRep, Date.now(), watchLead)), null);
+  const watchCalled = { result:{ ...result, call:'called', winner:'lead', winnerName:'Ken Paxton', winnerParty:'Republican', leadPercent:52, secondPercent:46 } };
+  const apCalled = { ...apLead, winner:apLead.leader };
+  assert.match(env.providerConflict(env.apRow('tx-senate', apCalled, Date.now(), watchCalled)), /watch.vote has called this race for Ken Paxton \(Republican\)/);
   const unlisted = { result:{ ...result, leadParty:null, leadPercent:52, secondPercent:40 } };
-  assert.equal(env.crossConflict(unlisted, env.mapRaceStatus(unlisted), { winner:null, leader:{ name:'Anyone', party:'dem' } }), null);
-  const called = env.mapRaceStatus({ result:{ ...result, call:'called', winner:'lead', winnerName:'Ken Paxton', winnerParty:'Republican' } });
-  assert.match(env.crossConflict({ result:{} }, called, calledByAp), /AP via NPR shows James Talarico \(Democratic\) as the winner/);
-  assert.equal(env.crossConflict(lead, status, null), null);
+  assert.equal(env.providerConflict(env.apRow('tx-senate', apLead, Date.now(), unlisted)), null);
+  assert.equal(env.providerConflict(env.apRow('tx-senate', apLead, Date.now(), null)), null);
+  assert.equal(env.providerConflict({ ...watchLead, source:'watch.vote' }), null);
 });
 
 test('market prices parse only live Yes/No books', () => {

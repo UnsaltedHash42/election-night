@@ -40,6 +40,7 @@ function setup(feedQueues) {
     setTimeout:(callback, delay) => { const id = ++serial; timers.set(id, { callback, at:now + delay }); return id; },
     clearTimeout:id => timers.delete(id),
     fetch:async url => {
+      requests.push(String(url));
       const file = Object.keys(feedQueues).find(name => String(url).endsWith(name));
       const queue = feedQueues[file];
       const next = Array.isArray(queue) ? queue.shift() : queue;
@@ -48,7 +49,7 @@ function setup(feedQueues) {
     } };
   context.window.document = document;
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync('public/map.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('public/ap.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('public/balance.js', 'utf8'), context);
   const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
   return { context, document, handlers, requests, timers, flush, set hidden(value) { document.hidden = value; } };
@@ -88,16 +89,19 @@ test('a failed refresh keeps the last counts; visibility resumes polling', async
   await harness.flush();
   assert.match(harness.document.getElementById('balance').children[1].textContent, /D 36 · R 32/);
 
+  const firstRound = harness.requests.length;
+  assert.equal(firstRound, 3);
   feedQueues['senate.json'] = [];
   feedQueues['house.json'] = [];
   feedQueues['gov.json'] = [];
   harness.handlers.visibilitychange();
   await harness.flush();
+  assert.equal(harness.requests.length, 6);
   assert.match(harness.document.getElementById('balance').children[1].textContent, /D 36 · R 32/);
 
   harness.hidden = true;
-  const before = harness.requests.length;
   harness.handlers.visibilitychange();
+  for (const timer of harness.timers.values()) timer.callback();
   await harness.flush();
-  assert.equal(harness.requests.length, before);
+  assert.equal(harness.requests.length, 6);
 });

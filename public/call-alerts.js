@@ -1,9 +1,10 @@
 'use strict';
 
 (() => {
-  const storageKey = 'election-night-calls-2026';
-  const callStates = ['not-called', 'called', 'certified', 'runoff', 'recount'];
-  const isCalled = (state) => ['called', 'certified'].includes(state);
+  const storageKey = 'election-night-ap-calls-2026';
+  const apSource = { authority:'AP via NPR', url:'https://apps.npr.org/2026-election-results/' };
+  const callStates = ['not-called', 'called'];
+  const isCalled = (state) => state === 'called';
   const sameWinner = (a, b) => a?.name === b?.name && a?.party === b?.party;
   const validSource = (source) => {
     if (!source || typeof source.authority !== 'string' || !source.authority.trim()) return false;
@@ -22,16 +23,10 @@
       this.onAlert = onAlert;
       this.races = new Map();
       this.states = new Map();
-      this.attempts = new Map();
-      this.errors = new Set();
+      this.checked = new Set();
       this.events = [];
       this.paused = false;
-      this.backoffUntil = 0;
       this.lastCheckedAt = null;
-      this.nextRequestAt = 0;
-      this.cursor = 0;
-      this.inflight = false;
-      this.timer = null;
       try {
         const saved = JSON.parse(sessionStorage.getItem(storageKey));
         if (Array.isArray(saved?.states)) {
@@ -39,31 +34,30 @@
         }
         if (Array.isArray(saved?.events)) this.events = saved.events.filter(validEntry).slice(0, 30);
       } catch {}
-      document.addEventListener('visibilitychange', () => { this.publish(); this.schedule(); });
+      document.addEventListener('visibilitychange', () => this.publish());
+      window.apResults.subscribe(() => this.check());
     }
 
     setRaces(rows) {
       this.races = new Map(rows.filter((race) => race && typeof race.id === 'string'
         && typeof race.name === 'string' && typeof race.slug === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(race.slug))
         .map((race) => [race.id, race]));
-      this.cursor %= this.races.size || 1;
-      this.publish();
-      this.schedule();
+      this.check();
     }
 
     setPaused(paused) {
       this.paused = Boolean(paused);
-      this.publish();
-      this.schedule();
+      this.check();
     }
 
     getSnapshot() {
       const ids = [...this.races.keys()];
+      const unavailable = ids.filter((id) => window.apResults.failed(window.apResults.officeFor(this.races.get(id))));
       return {
-        paused:this.paused, hidden:document.hidden, backoffUntil:this.backoffUntil, total:ids.length,
-        checkedCount:ids.filter((id) => this.attempts.has(id)).length,
-        errorCount:ids.filter((id) => this.errors.has(id)).length, lastCheckedAt:this.lastCheckedAt,
-        unavailable:ids.filter((id) => this.errors.has(id)).map((id) => this.races.get(id).name),
+        paused:this.paused, hidden:document.hidden, backoffUntil:0, total:ids.length,
+        checkedCount:ids.filter((id) => this.checked.has(id)).length,
+        errorCount:unavailable.length, lastCheckedAt:this.lastCheckedAt,
+        unavailable:unavailable.map((id) => this.races.get(id).name),
         calls:ids.map((id) => this.states.get(id)).filter((entry) => entry && isCalled(entry.callState))
           .sort((a, b) => b.detectedAt - a.detectedAt),
         events:this.events.filter((entry) => this.races.has(entry.raceId))
@@ -74,90 +68,37 @@
       this.onChange(this.getSnapshot());
     }
 
-    schedule() {
-      clearTimeout(this.timer);
-      this.timer = null;
-      if (this.paused || document.hidden || this.inflight || !this.races.size) return;
-      const due = Math.min(...[...this.races.keys()].map((id) => this.attempts.has(id) ? this.attempts.get(id) + 120000 : 0));
-      const delay = Math.max(0, due - Date.now(), this.nextRequestAt - Date.now(), this.backoffUntil - Date.now());
-      this.timer = setTimeout(() => this.poll(), delay);
+    check() {
+      const checkedAt = window.apResults.checkedAt;
+      if (this.paused || document.hidden || !checkedAt) { this.publish(); return; }
+      const alerts = [];
+      for (const race of this.races.values()) {
+        if (!window.apResults.office(window.apResults.officeFor(race))) continue;
+        const event = this.accept(race, window.apResults.get(race.id), checkedAt);
+        this.checked.add(race.id);
+        if (event) alerts.push(event);
+      }
+      this.lastCheckedAt = checkedAt;
+      try { sessionStorage.setItem(storageKey, JSON.stringify({ states:[...this.states.values()], events:this.events })); } catch {}
+      this.publish();
+      for (const event of alerts) this.onAlert(event);
     }
 
-    async poll() {
-      this.timer = null;
-      if (this.paused || document.hidden || this.inflight || !this.races.size) return;
-      if (Date.now() < Math.max(this.nextRequestAt, this.backoffUntil)) { this.schedule(); return; }
-      const races = [...this.races.values()];
-      let race;
-      for (let offset = 0; offset < races.length; offset++) {
-        const index = (this.cursor + offset) % races.length;
-        const candidate = races[index];
-        if (!this.attempts.has(candidate.id) || Date.now() - this.attempts.get(candidate.id) >= 120000) {
-          race = candidate; this.cursor = (index + 1) % races.length; break;
-        }
-      }
-      if (!race) { this.schedule(); return; }
-      this.inflight = true;
-      this.attempts.set(race.id, Date.now());
-      let event;
-      try {
-        const response = await fetch(`https://watch.vote/api/widgets/race/${race.slug}`, { signal:AbortSignal.timeout(15000) });
-        if (response.status === 429) {
-          const retry = response.headers.get('Retry-After');
-          const seconds = retry !== null && retry.trim() !== '' ? Number(retry) : NaN;
-          const until = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(retry);
-          this.backoffUntil = Number.isFinite(until) ? Math.max(Date.now() + 2000, until) : Date.now() + 300000;
-        }
-        if (!response.ok) throw new Error('Provider unavailable');
-        const data = await response.json();
-        if (!this.paused && !document.hidden && this.races.get(race.id)?.slug === race.slug) event = this.accept(race, data);
-      } catch {
-        this.errors.add(race.id);
-      } finally {
-        this.inflight = false;
-        this.lastCheckedAt = Date.now();
-        this.nextRequestAt = Date.now() + 2000;
-        this.publish();
-        this.schedule();
-      }
-      if (event && !this.paused && !document.hidden) this.onAlert(event);
-    }
-
-    accept(race, data) {
-      if (data?.version !== 1 || data.raceSlug !== race.slug || data.raceId !== `2026-${race.slug}`
-        || data.electionDate !== '2026-11-03') throw new Error('Wrong race or election');
+    accept(race, ap, checkedAt) {
       const previous = this.states.get(race.id);
-      const results = data.results;
-      if (results === null) {
-        if (previous) throw new Error('Results unavailable');
-        this.errors.delete(race.id);
-        return;
-      }
-      if (!results || !callStates.includes(results.callState) || results.freshness !== 'fresh'
-        || !validSource(results.source) || !Number.isFinite(Date.parse(results.updatedAt))
-        || !Number.isFinite(Date.parse(results.fetchedAt))
-        || !Array.isArray(results.candidates) || results.candidates.some((candidate) => !candidate
-          || typeof candidate.name !== 'string' || !candidate.name.trim()
-          || (candidate.party !== null && typeof candidate.party !== 'string') || typeof candidate.winner !== 'boolean')) {
-        throw new Error('Unverified results');
-      }
-      if (previous && Date.parse(results.updatedAt) < Date.parse(previous.updatedAt)) throw new Error('Older results');
-      const winners = results.candidates.filter((candidate) => candidate.winner);
-      if (isCalled(results.callState) ? winners.length !== 1 : winners.length !== 0) throw new Error('Inconsistent call');
-      const winner = winners.length ? { name:winners[0].name, party:winners[0].party ?? 'Party not listed' } : null;
+      if (!ap && previous) return undefined;
+      const winner = ap?.winner ? { name:ap.winner.name, party:ap.winner.partyName || 'Party not listed' } : null;
       let type;
       if (!previous && winner) type = 'existing';
       else if (previous?.winner && !sameWinner(previous.winner, winner)) type = 'correction';
       else if (previous && !previous.winner && winner) type = 'call';
+      if (previous && !type) return undefined;
       const entry = {
-        raceId:race.id, label:race.name, callState:results.callState, winner,
-        source:{ authority:results.source.authority, url:results.source.url }, updatedAt:results.updatedAt,
-        detectedAt:type ? Date.now() : previous?.detectedAt ?? Date.now(), type:type || previous?.type || 'existing'
+        raceId:race.id, label:race.name, callState:winner ? 'called' : 'not-called', winner, source:apSource,
+        updatedAt:new Date(checkedAt).toISOString(), detectedAt:Date.now(), type:type || 'existing'
       };
       this.states.set(race.id, entry);
-      this.errors.delete(race.id);
       if (type) this.events = [entry, ...this.events].slice(0, 30);
-      try { sessionStorage.setItem(storageKey, JSON.stringify({ states:[...this.states.values()], events:this.events })); } catch {}
       return type && type !== 'existing' ? entry : undefined;
     }
   };

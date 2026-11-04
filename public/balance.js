@@ -1,59 +1,36 @@
 'use strict';
 
 const balanceChambers = [
-  { key:'senate', label:'Senate', total:100, majority:51, file:'senate.json',
+  { key:'senate', label:'Senate', total:100, majority:51,
     base:{ dem:34, rep:31, other:0 }, note:'Includes 65 seats not up tonight: Democratic caucus 34 (with 2 independents), Republicans 31. A 50–50 tie goes to the vice president.' },
-  { key:'house', label:'House', total:435, majority:218, file:'house.json', base:null, note:'' },
-  { key:'governors', label:'Governor', total:36, majority:19, file:'gov.json', base:null, note:'Of tonight’s 36 governor races.' }
+  { key:'house', label:'House', total:435, majority:218, base:null, note:'' },
+  { key:'governors', label:'Governor', total:36, majority:19, base:null, note:'Of tonight’s 36 governor races.' }
 ];
 
 const balance = {
-  data:null, checkedAt:null, loading:false, generation:0, timer:null,
+  data:null, checkedAt:null,
   clock:new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' }),
   el(id) { return document.getElementById(id); },
 
-  async start() {
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refresh(); });
-    await this.refresh();
-  },
-
-  async read(file) {
-    const response = await fetch(`https://apps.npr.org/2026-election-results/data/${file}`, { signal:AbortSignal.timeout(15000) });
-    if (!response.ok) throw new Error('Feed unavailable');
-    return readNprRaces(await response.json());
-  },
-
-  async refresh() {
-    clearTimeout(this.timer);
-    if (document.hidden) return;
-    const generation = ++this.generation;
-    this.loading = true;
-    this.render();
-    try {
-      const feeds = await Promise.all(balanceChambers.map(chamber => this.read(chamber.file)));
-      if (generation !== this.generation) return;
-      const data = {};
-      for (const [index, chamber] of balanceChambers.entries()) {
-        const suffix = chamber.key === 'senate' ? '-senate' : chamber.key === 'governors' ? '-governor' : '-house-';
-        let dem = chamber.base?.dem || 0, rep = chamber.base?.rep || 0, other = chamber.base?.other || 0;
-        for (const [id, race] of feeds[index]) {
-          if (!id.includes(suffix) || !race.winner) continue;
-          if (id === 'dc-house-00') continue;
-          if (race.winner.party === 'dem') dem++;
-          else if (race.winner.party === 'rep') rep++;
-          else other++;
-        }
-        data[chamber.key] = { dem, rep, other, called:dem + rep + other, uncalled:chamber.total - dem - rep - other };
+  update() {
+    const data = { ...this.data };
+    for (const chamber of balanceChambers) {
+      const races = window.apResults.office(chamber.key);
+      if (!races) continue;
+      let dem = chamber.base?.dem || 0, rep = chamber.base?.rep || 0, other = chamber.base?.other || 0;
+      for (const [id, race] of races) {
+        if (!race.winner || id === 'dc-house-00') continue;
+        if (race.winner.party === 'dem') dem++;
+        else if (race.winner.party === 'rep') rep++;
+        else other++;
       }
-      this.data = data;
-      this.checkedAt = Date.now();
-    } catch { /* the last successful count stays in place */ } finally {
-      if (generation === this.generation) {
-        this.loading = false;
-        this.render();
-        if (!document.hidden) this.timer = setTimeout(() => this.refresh(), 60000);
-      }
+      data[chamber.key] = { dem, rep, other, called:dem + rep + other, uncalled:chamber.total - dem - rep - other };
     }
+    if (balanceChambers.every(chamber => data[chamber.key])) {
+      this.data = data;
+      this.checkedAt = window.apResults.checkedAt;
+    }
+    this.render();
   },
 
   row(chamber) {
@@ -97,13 +74,12 @@ const balance = {
     const box = this.el('balance');
     const status = this.el('balance-status');
     if (!this.data) {
-      status.textContent = this.loading ? 'Loading AP race calls…' : 'AP race calls have not loaded yet.';
+      status.textContent = 'Loading AP race calls…';
       return;
     }
-    status.textContent = `AP race calls via NPR’s public feed · calls only, not forecasts · checked ${this.clock.format(new Date(this.checkedAt))}${this.loading ? ' · updating…' : ''}`;
+    status.textContent = `AP race calls via NPR’s public feed · calls only, not forecasts · checked ${this.clock.format(new Date(this.checkedAt))}`;
     box.replaceChildren(status, ...balanceChambers.map(chamber => this.row(chamber)));
   }
 };
 
-if (typeof readNprRaces === 'function') balance.start();
-else document.getElementById('balance-status').textContent = 'Balance counts are unavailable because the map did not load.';
+window.apResults.subscribe(() => balance.update());

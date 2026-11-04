@@ -94,10 +94,10 @@ function renderCalls(snapshot) {
       source.href = ['https:', 'http:'].includes(url.protocol) ? url.href : title.href;
     } catch { source.href = title.href; }
     source.target = '_blank'; source.rel = 'noopener noreferrer';
-    const attribution = element('p', 'call-source', 'watch.vote · ');
+    const attribution = element('p', 'call-source', 'Source: ');
     attribution.append(source);
     const timestamp = new Date(event.updatedAt);
-    const timing = `Detected ${callTime.format(new Date(event.detectedAt))}${Number.isFinite(timestamp.getTime()) ? ` · Source updated ${timestamp.toLocaleString()}` : ''}`;
+    const timing = `Detected ${callTime.format(new Date(event.detectedAt))}${Number.isFinite(timestamp.getTime()) ? ` · AP feed checked ${callTime.format(timestamp)}` : ''}`;
     card.append(title, element('strong', 'call-outcome', callText(event)), element('p', 'call-time', timing), attribution);
     return card;
   }));
@@ -148,6 +148,7 @@ function raceCard(race) {
     (replacement || $('view-pinned')).focus({ preventScroll: true });
   });
   header.append(title, pin);
+  const ap = element('p', 'race-ap');
   const frame = element('iframe', 'race-frame');
   frame.src = `https://watch.vote/widget/race/${race.slug}?theme=dark`;
   frame.title = `${race.name} — 2026 results from watch.vote`;
@@ -159,8 +160,26 @@ function raceCard(race) {
   source.target = '_blank';
   source.rel = 'noopener noreferrer';
   fallback.append(source, element('span', '', 'Use this link if the card is blank.'));
-  card.append(header, frame, fallback);
+  card.append(header, ap, frame, fallback);
   return card;
+}
+
+function apLine(race) {
+  const result = window.apResults?.get(race.id);
+  if (!window.apResults?.checkedAt) return 'AP via NPR: loading…';
+  if (!result) return 'AP via NPR: no votes reported yet';
+  const person = (item) => `${item.name} (${item.partyName || 'party not listed'})${item.share !== null ? ` ${item.share.toFixed(1)}%` : ''}`;
+  const counted = result.expected !== null ? ` · ${result.expected.toFixed(0)}% of expected vote counted` : '';
+  if (result.winner) return `AP via NPR: ✓ Called for ${person(result.winner)}${counted}`;
+  return `AP via NPR: ${person(result.leader)} leads${result.second ? `, ${person(result.second)}` : ''} · not called${counted}`;
+}
+
+function renderApLines() {
+  for (const card of $('race-grid').querySelectorAll('.race-card')) {
+    const race = races.find((item) => item.id === card.dataset.raceId);
+    const line = card.querySelector('.race-ap');
+    if (race && line) line.textContent = apLine(race);
+  }
 }
 
 function matchingRaces() {
@@ -218,6 +237,7 @@ function render() {
     button.setAttribute('aria-pressed', String(pinned));
     button.setAttribute('aria-label', `${pinned ? 'Unpin' : 'Pin'} ${race.name}`);
   }
+  renderApLines();
 }
 
 async function loadDirectory() {
@@ -310,3 +330,4 @@ $('alerts-sound').addEventListener('click', async () => {
 });
 updateLocation();
 loadDirectory();
+window.apResults?.subscribe(renderApLines);

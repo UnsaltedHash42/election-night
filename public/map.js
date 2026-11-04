@@ -26,76 +26,29 @@ function mapRaceStatus(row) {
   return { kind:'waiting', party:'none', stale, text:'Awaiting a reported lead · Not called' };
 }
 
-function nprParty(value) {
-  if (value === 'Dem') return 'dem';
-  if (/^(GOP|Rep)/.test(value || '')) return 'rep';
-  return 'other';
-}
-
-function readNprRaces(data) {
-  if (!data || !Array.isArray(data.results)) throw new Error('Invalid NPR results');
-  const map = new Map();
-  for (const item of data.results) {
-    if (item?.test !== false || !/^[A-Z]{2}$/.test(item?.state || '')) continue;
-    let id;
-    if (item.office === 'S' && item.type === 'General') id = `${item.state.toLowerCase()}-senate`;
-    else if (item.office === 'G' && item.type === 'General') id = `${item.state.toLowerCase()}-governor`;
-    else if (item.office === 'H' && ['General', 'Nonpartisan Election'].includes(item.type)) {
-      const district = ['AK', 'DE', 'ND', 'SD', 'VT', 'WY'].includes(item.state) ? 0 : Number(item.seatNumber);
-      if (!Number.isInteger(district) || district < 0 || String(item.seatNumber).trim() === '') continue;
-      id = `${item.state.toLowerCase()}-house-${String(district).padStart(2, '0')}`;
-    } else continue;
-    const named = (item.candidates || []).filter(candidate => candidate.party !== 'Other' && (candidate.last || candidate.first));
-    const counted = named.filter(candidate => Number.isFinite(candidate.votes) && candidate.votes > 0).sort((a, b) => b.votes - a.votes);
-    const winner = named.find(candidate => candidate.winner === 'X') || null;
-    if (!winner && !counted.length) continue;
-    const total = (item.candidates || []).reduce((sum, candidate) => sum + (Number.isFinite(candidate.votes) && candidate.votes > 0 ? candidate.votes : 0), 0);
-    const name = candidate => `${candidate.first || ''} ${candidate.last || ''}`.trim();
-    const person = candidate => candidate ? { name:name(candidate), party:nprParty(candidate.party), partyName:nprPartyName(candidate.party),
-      share:total ? Math.round((candidate.votes / total) * 1000) / 10 : null } : null;
-    const leader = person(counted[0]);
-    map.set(id, {
-      winner: person(winner),
-      leader,
-      second: person(counted[1]),
-      percent: leader?.share ?? null,
-      expected: Number.isFinite(item.eevp) && item.eevp >= 0 && item.eevp <= 1 ? Math.round(item.eevp * 1000) / 10 : null
-    });
-  }
-  return map;
-}
-
-function nprPartyName(value) {
-  return { Dem:'Democratic', GOP:'Republican' }[value] || value || null;
-}
-
-function apRow(raceId, cross, checkedAt, reason = 'missing') {
-  const { winner, leader, second } = cross;
+function apRow(raceId, ap, checkedAt, watch) {
+  const { winner, leader, second } = ap;
   const place = !winner ? null : winner.name === leader?.name ? 'lead' : winner.name === second?.name ? 'second' : 'other';
-  return { raceId:`2026-${raceId}`, apFill:reason,
+  return { raceId:`2026-${raceId}`, source:'ap', ap, watch:watch || null,
     official:{ authority:'AP via NPR', url:'https://apps.npr.org/2026-election-results/', read:true },
     result:{ raceId:`2026-${raceId}`, call:winner ? 'called' : 'not-called', calledBy:winner ? 'AP' : null, runoffOn:null,
       sourceKind:'licensed', winner:place, winnerName:winner?.name || null, winnerParty:winner?.partyName || null,
       leadName:leader?.name || null, leadParty:leader?.partyName || null, leadPercent:leader?.share ?? null,
       secondName:second?.name || null, secondParty:second?.partyName || null, secondPercent:second?.share ?? null,
-      countedKind:cross.expected === null ? null : 'expected', countedPercent:cross.expected,
+      countedKind:ap.expected === null ? null : 'expected', countedPercent:ap.expected,
       authority:'AP via NPR', fetchedAt:new Date(checkedAt).toISOString() } };
 }
 
-function crossConflict(row, status, cross) {
-  if (!cross || row?.apFill) return null;
-  const label = party => ({ dem:'Democratic', rep:'Republican' })[party] || 'a third party';
+function providerConflict(row) {
+  if (row?.source !== 'ap' || !row.watch?.result) return null;
+  const ap = row.ap, watch = row.watch.result, status = mapRaceStatus(row.watch);
+  const apParty = ap.winner?.party || ap.leader?.party;
+  if (!apParty) return null;
   if (['called', 'certified'].includes(status.kind)) {
-    if (cross.winner && cross.winner.party !== status.party)
-      return `AP via NPR shows ${cross.winner.name} (${label(cross.winner.party)}) as the winner here.`;
-    return null;
+    return status.party !== apParty ? `watch.vote has called this race for ${watch.winnerName} (${watch.winnerParty || 'party not listed'}).` : null;
   }
-  if (status.kind !== 'leading' || !row?.result?.leadParty) return null;
-  if (cross.winner && cross.winner.party !== mapParty(row.result.leadParty))
-    return `AP via NPR has already called this race for ${cross.winner.name} (${label(cross.winner.party)}).`;
-  if (cross.leader && cross.leader.party !== mapParty(row.result.leadParty))
-    return `AP via NPR currently shows ${cross.leader.name} (${label(cross.leader.party)}) leading${cross.percent !== null ? ` with ${cross.percent.toFixed(1)}%` : ''}.`;
-  return null;
+  if (status.kind !== 'leading' || !watch.leadParty || mapParty(watch.leadParty) === apParty) return null;
+  return `watch.vote shows ${watch.leadName} (${watch.leadParty}) leading with ${watch.leadPercent.toFixed(1)}%.`;
 }
 
 const oddsRaces = {
@@ -128,7 +81,7 @@ window.ElectionMap = class ElectionMap {
     this.selectedRace = homeState ? `${homeState.toLowerCase()}-senate` : '';
     this.races = [];
     this.cache = new Map();
-    this.cross = { byRace:new Map(), checkedAt:null };
+    window.apResults?.subscribe(() => this.render());
     this.odds = new Map();
     this.nodes = new Map();
     this.generation = 0;
@@ -227,21 +180,11 @@ window.ElectionMap = class ElectionMap {
       clearTimeout(timeout);
       if (generation === this.generation) {
         this.loading = false;
-        await Promise.all([this.loadCross(office, generation), this.loadOdds(generation)]);
+        await this.loadOdds(generation);
         this.render();
         if (!document.hidden) this.timer = setTimeout(() => this.refresh(), delay);
       }
     }
-  }
-
-  async loadCross(office, generation) {
-    try {
-      const response = await fetch(`https://apps.npr.org/2026-election-results/data/${office === 'governors' ? 'gov' : office}.json`, { signal:AbortSignal.timeout(15000) });
-      if (!response.ok) return;
-      const byRace = readNprRaces(await response.json());
-      if (generation !== this.generation) return;
-      this.cross = { byRace, checkedAt:Date.now() };
-    } catch { /* the last successful cross-check stays in place */ }
   }
 
   async loadOdds(generation) {
@@ -257,13 +200,12 @@ window.ElectionMap = class ElectionMap {
   }
 
   mergedRows() {
-    const rows = new Map((this.cache.get(this.office)?.payload.rows || []).map(row => [row.raceId.replace(/^2026-/, ''), row]));
-    const ids = new Set(this.officeRaces().map(race => race.id));
-    for (const [id, cross] of this.cross.byRace) {
-      if (!ids.has(id)) continue;
-      const existing = rows.get(id)?.result;
-      if (!existing) rows.set(id, apRow(id, cross, this.cross.checkedAt));
-      else if (cross.winner && !['called', 'certified'].includes(existing.call)) rows.set(id, apRow(id, cross, this.cross.checkedAt, 'call'));
+    const watch = new Map((this.cache.get(this.office)?.payload.rows || []).map(row => [row.raceId.replace(/^2026-/, ''), row]));
+    const rows = new Map();
+    for (const race of this.officeRaces()) {
+      const ap = window.apResults?.get(race.id), row = watch.get(race.id);
+      if (ap) rows.set(race.id, apRow(race.id, ap, window.apResults.checkedAt, row));
+      else if (row) rows.set(race.id, { ...row, source:'watch.vote' });
     }
     return rows;
   }
@@ -271,16 +213,15 @@ window.ElectionMap = class ElectionMap {
   renderStatus() {
     const saved = this.cache.get(this.office);
     const rows = [...this.mergedRows().values()].filter(row => row.result);
-    const filled = rows.filter(row => row.apFill === 'missing').length;
-    const apCalls = rows.filter(row => row.apFill === 'call').length;
-    const notes = [filled && `${filled} from AP via NPR where watch.vote has none`, apCalls && `${apCalls} AP ${apCalls === 1 ? 'call' : 'calls'} watch.vote hasn’t made`].filter(Boolean);
+    const fallback = rows.filter(row => row.source === 'watch.vote').length;
     const called = rows.filter(row => mapRaceStatus(row).kind === 'called').length;
-    const disputed = rows.filter(row => crossConflict(row, mapRaceStatus(row), this.cross.byRace.get(row.raceId.replace(/^2026-/, '')))).length;
-    const checked = Math.max(saved?.checkedAt || 0, this.cross.checkedAt || 0);
+    const disputed = rows.filter(row => providerConflict(row)).length;
+    const checked = Math.max(saved?.checkedAt || 0, window.apResults?.checkedAt || 0);
     this.el('map-status').textContent = document.hidden ? 'Ⅱ Map checks paused in background'
-      : checked ? `${rows.length} races with results${notes.length ? ` (${notes.join('; ')})` : ''} · ${called} called${disputed ? ` · ⚠ ${disputed} ${disputed === 1 ? 'race where' : 'races where'} AP and watch.vote disagree` : ''} · Checked ${this.time.format(new Date(checked))}${this.loading ? ' · Updating…' : ''}`
+      : checked ? `${rows.length} races with results · ${called} called · AP via NPR${fallback ? `; watch.vote for ${fallback} AP hasn’t reported` : ''}${disputed ? ` · ⚠ ${disputed} ${disputed === 1 ? 'race where' : 'races where'} watch.vote disagrees` : ''} · Checked ${this.time.format(new Date(checked))}${this.loading ? ' · Updating…' : ''}`
       : this.loading ? 'Loading results…' : 'Waiting for results';
-    this.el('map-error').hidden = !this.error;
+    const apCovered = Boolean(window.apResults?.office(this.office)) && !window.apResults.failed(this.office);
+    this.el('map-error').hidden = !this.error || apCovered;
     this.el('map-error').textContent = this.error || '';
     this.el('map-retry').disabled = Boolean(this.loading);
   }
@@ -331,7 +272,7 @@ window.ElectionMap = class ElectionMap {
     for (const { shape, path, title } of this.nodes.values()) {
       const race = raceByShape.get(shape.id);
       const status = race ? mapRaceStatus(rows.get(race.id)) : { kind:'no-race', party:'none', text:`No ${this.officeName()} race in 2026` };
-      const conflict = race ? crossConflict(rows.get(race.id), status, this.cross.byRace.get(race.id)) : null;
+      const conflict = race ? providerConflict(rows.get(race.id)) : null;
       const selected = race ? race.id === this.selectedRace : shape.id === this.selectedState;
       path.setAttribute('class', `map-region ${status.kind} ${status.party}${status.stale ? ' stale' : ''}${conflict ? ' disputed' : ''}${selected ? ' selected' : ''}`);
       path.setAttribute('aria-label', `${race?.name || shape.name}: ${status.text}${status.stale ? ' · Source check over 10 minutes old' : ''}${conflict ? ' · Sources disagree' : ''}`);
@@ -360,14 +301,12 @@ window.ElectionMap = class ElectionMap {
     } else {
       const result = row?.result, status = mapRaceStatus(row);
       content.push(this.node('p', `map-outcome ${status.kind}`, status.text));
-      if (row?.apFill) content.push(this.node('p', 'map-ap-fill', row.apFill === 'call'
-        ? 'AP has called this race; watch.vote has not yet — showing AP’s call and counts via NPR.'
-        : 'watch.vote has no result for this race yet — showing AP counts and calls via NPR.'));
-      const conflict = crossConflict(row, status, this.cross.byRace.get(race.id));
+      if (row?.source === 'watch.vote' && result) content.push(this.node('p', 'map-ap-fill', 'AP via NPR has no results for this race yet — showing watch.vote.'));
+      const conflict = providerConflict(row);
       if (conflict) {
         content.push(this.node('p', 'map-conflict', `⚠ Sources disagree — ${conflict}`));
-        const compare = this.node('a', '', 'Compare at NPR’s AP results ↗');
-        compare.href = 'https://apps.npr.org/2026-election-results/';
+        const compare = this.node('a', '', 'Compare at watch.vote ↗');
+        compare.href = `https://watch.vote/midterms/2026/races/${race.slug}`;
         compare.target = '_blank'; compare.rel = 'noopener noreferrer';
         content.push(compare);
       }
@@ -395,6 +334,14 @@ window.ElectionMap = class ElectionMap {
       source.href = row?.official?.url || `https://watch.vote/midterms/2026/races/${race.slug}`;
       source.target = '_blank'; source.rel = 'noopener noreferrer';
       content.push(source);
+      const official = row?.watch?.official;
+      if (official?.url) {
+        const link = this.node('a', '', `Official results: ${official.authority} ↗`);
+        link.href = official.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        const line = this.node('p', 'map-source-time');
+        line.append(link);
+        content.push(line);
+      }
       const explore = this.node('button', 'button', 'Open race in the desk ↓');
       explore.id = 'map-explore'; explore.type = 'button';
       explore.addEventListener('click', () => this.onExplore({ raceId:race.id }));

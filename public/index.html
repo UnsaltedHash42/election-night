@@ -7,6 +7,7 @@
   <meta name="description" content="Follow national election coverage and build a personal watchlist of 2026 races with source-attributed results.">
   <title>Election Night · November 3, 2026</title>
   <link rel="stylesheet" href="/styles.css">
+  <script src="/ap.js" defer></script>
   <script src="/call-alerts.js" defer></script>
   <script src="/map.js" defer></script>
   <script src="/balance.js" defer></script>
@@ -74,7 +75,7 @@
       <section class="call-section" aria-labelledby="calls-title">
         <div class="section-heading"><div><h2 id="calls-title">Call alerts</h2><p id="calls-status" role="status">Opening the call monitor…</p></div><div class="call-controls"><button id="alerts-pause" class="button" type="button" aria-pressed="false">Pause alerts</button><button id="alerts-sound" class="button" type="button" aria-pressed="false">Enable sound</button></div></div>
         <label class="key-alert-option"><input id="alerts-key" type="checkbox" checked> Include national key races</label>
-        <p class="coverage-note">Saved races are always included. Keep this page open and visible; checks pause in the background. Races are checked about every two minutes; large watchlists take longer. Calls come from watch.vote's published results and may lag other outlets.</p>
+        <p class="coverage-note">Saved races are always included. Keep this page open and visible; checks pause in the background. Every watched race is checked against AP race calls via NPR about once a minute, the same feed that drives the map and balance strip.</p>
         <details id="calls-coverage" class="call-coverage" hidden><summary>Delayed or unavailable races</summary><p id="calls-unavailable"></p></details>
         <p id="call-announcement" class="call-announcement" role="status" aria-live="polite" aria-atomic="true" hidden></p>
         <div id="call-events" class="call-events"><p class="call-empty">No calls observed yet. A lead never triggers an alert.</p></div>
@@ -91,7 +92,7 @@
       <section id="race-desk" class="race-section" aria-labelledby="race-title">
         <div class="section-heading"><div><h2 id="race-title" tabindex="-1">Your race desk</h2><p id="results-count" role="status">Loading the race directory…</p></div><div class="view-switch" role="group" aria-label="Race view"><button id="view-key" class="active" type="button" aria-pressed="true">Key races</button><button id="view-all" type="button" aria-pressed="false">All races</button><button id="view-pinned" type="button" aria-pressed="false">☆ Watchlist <span id="pin-count">0</span></button></div></div>
         <div class="filters"><label class="search-label"><span class="sr-only">Search race names or states</span><input id="search" type="search" placeholder="Find a race or state" autocomplete="off"></label><label><span class="sr-only">Filter by state</span><select id="state-filter"><option value="">All states</option></select></label><label><span class="sr-only">Filter by office</span><select id="office-filter"><option value="">All offices</option><option>Senate</option><option>House</option><option>Governor</option><option>Delegate</option></select></label></div>
-        <p class="coverage-note">Counts, call status, source and update time appear inside each watch.vote card. Cards update through the provider when results are available; a reported lead is not a call. Reload for fresh counts if reduced motion or reduced data is enabled.</p>
+        <p class="coverage-note">The line above each card shows AP’s latest count and call via NPR, refreshed about once a minute. The watch.vote card below it has candidate details and official sources; it may lag AP or be blank where watch.vote has no results. A reported lead is not a call.</p>
         <div id="directory-error" class="alert" role="alert" hidden><p>The race directory could not be loaded. National coverage links remain available above.</p><button id="retry" class="button" type="button">Try again</button></div>
         <div id="race-grid" class="race-grid"><p class="empty-state">Opening the race directory…</p></div>
         <nav id="pagination" class="pagination" aria-label="Race pages" hidden><button id="page-prev" class="button" type="button" aria-controls="race-grid">← Previous</button><span id="page-label" aria-live="polite"></span><button id="page-next" class="button" type="button" aria-controls="race-grid">Next →</button></nav>

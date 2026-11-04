@@ -30,7 +30,8 @@ const response = (data, status = 200, retry = null) => ({ ok:status === 200, sta
 function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = () => response(null, 404), fetchOdds = () => response(null, 404)) {
   let now = started, serial = 0;
   const timers = new Map(), requests = [], explored = [], handlers = {};
-  const document = { hidden:false, activeElement:null, addEventListener:(name, callback) => { handlers[name] = callback; } };
+  const document = { hidden:false, activeElement:null, addEventListener:(name, callback) => {
+    const previous = handlers[name]; handlers[name] = previous ? () => { previous(); callback(); } : callback; } };
   class Element {
     constructor(tag = 'div') { this.tagName = tag; this.children = []; this.attributes = {}; this.dataset = {}; this.listeners = {}; this.value = ''; this.hidden = false; this.id = ''; this.text = ''; }
     append(...children) { this.children.push(...children); }
@@ -70,6 +71,7 @@ function setup(fetchResults, fetchShapes = () => response(shapes), fetchNpr = ()
     }
   };
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync('public/ap.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('public/map.js', 'utf8'), context);
   const map = new context.window.ElectionMap({ stateNames:{ AR:'Arkansas', GA:'Georgia' }, homeState:'AR', onExplore:value => explored.push(value) });
   const flush = async() => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -198,22 +200,52 @@ test('a failed geometry load can be retried without starting duplicate result ch
   assert.equal(env.requests.length, 2);
 });
 
-test('a contradicting AP count marks the race disputed without replacing it', async() => {
+test('AP counts lead the map, and a watch.vote disagreement is flagged beside them', async() => {
   const npr = () => response({ results:[
-    { test:false, state:'AR', office:'S', type:'General',
-      candidates:[{ id:4, first:'Rival', last:'Leader', party:'GOP', votes:900, percent:0.61 }] },
+    { test:false, state:'AR', office:'S', type:'General', eevp:0.4,
+      candidates:[{ id:4, first:'Rival', last:'Leader', party:'GOP', votes:610 }, { id:5, first:'Known', last:'leader', party:'Dem', votes:390 }] },
     { test:false, state:'GA', office:'S', type:'General',
-      candidates:[{ id:5, first:'Same', last:'Leader', party:'Dem', votes:900, percent:0.6 }] }
+      candidates:[{ id:6, first:'Same', last:'Leader', party:'Dem', votes:900 }] }
   ]});
-  const env = setup(request => response(payload('senate', 'Known leader')), undefined, npr);
-  await env.flush();
-  assert.match(env.el('map-status').textContent, /1 race where AP and watch.vote disagree/);
-  assert.match(env.el('map-detail').textContent, /⚠ Sources disagree/);
-  assert.match(env.el('map-detail').textContent, /Rival Leader/);
-  assert.match(env.el('map-detail').textContent, /Known leader/);
-  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /disputed/);
+  const env = setup(() => response(payload('senate', 'Known leader')), undefined, npr);
+  await env.flush(); await env.flush();
+  assert.match(env.el('map-status').textContent, /2 races with results · 0 called · AP via NPR · ⚠ 1 race where watch.vote disagrees/);
+  const detail = env.el('map-detail').textContent;
+  assert.match(detail, /Leading: Rival Leader \(Republican\) · Not called/);
+  assert.match(detail, /Rival Leader · Republican · 61\.0%/);
+  assert.match(detail, /40\.0% of expected vote counted/);
+  assert.match(detail, /⚠ Sources disagree — watch.vote shows Known leader \(Democratic\) leading with 55\.0%/);
+  assert.match(detail, /Official results: Fixture election office/);
+  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /leading rep disputed/);
   assert.doesNotMatch(env.map.nodes.get('GA').path.getAttribute('class'), /disputed/);
-  assert.match(env.map.nodes.get('AR').path.getAttribute('aria-label'), /Sources disagree/);
+  assert.equal(env.el('map-error').hidden, true);
+});
+
+test('watch.vote fills only races AP has not reported, with a note', async() => {
+  const npr = () => response({ results:[
+    { test:false, state:'AR', office:'S', type:'General', winnerId:null,
+      candidates:[{ id:1, first:'Cindy', last:'Hyde', party:'GOP', votes:321723, winner:'X' }, { id:2, first:'Scott', last:'Colom', party:'Dem', votes:307810 }] }
+  ]});
+  const env = setup(() => response(payload('senate', 'Known leader')), undefined, npr);
+  await env.flush(); await env.flush();
+  assert.match(env.el('map-status').textContent, /2 races with results · 1 called · AP via NPR; watch.vote for 1 AP hasn’t reported/);
+  assert.match(env.el('map-detail').textContent, /✓ Called: Cindy Hyde \(Republican\)/);
+  assert.match(env.el('map-detail').textContent, /Call by AP/);
+  env.el('map-race').value = 'ga-senate';
+  env.el('map-race').listeners.change();
+  await env.flush();
+  assert.match(env.el('map-detail').textContent, /Leading: Known leader \(Democratic\)/);
+  assert.match(env.el('map-detail').textContent, /AP via NPR has no results for this race yet — showing watch.vote/);
+});
+
+test('the map follows each new AP update without waiting for its own poll', async() => {
+  let ap = { results:[{ test:false, state:'AR', office:'S', type:'General', candidates:[{ id:1, first:'Early', last:'Lead', party:'Dem', votes:5 }] }] };
+  const env = setup(() => response(payload('senate', 'Known leader')), undefined, () => response(ap));
+  await env.flush(); await env.flush();
+  assert.match(env.el('map-detail').textContent, /Leading: Early Lead/);
+  ap = { results:[{ test:false, state:'AR', office:'S', type:'General', candidates:[{ id:1, first:'Early', last:'Lead', party:'Dem', votes:5, winner:'X' }] }] };
+  await env.advance(60000); await env.flush();
+  assert.match(env.el('map-detail').textContent, /✓ Called: Early Lead \(Democratic\)/);
 });
 
 test('a key race shows its live market price beside the count', async() => {
@@ -233,58 +265,4 @@ test('a key race shows its live market price beside the count', async() => {
   env.el('map-race').listeners.change();
   await env.flush();
   assert.doesNotMatch(env.el('map-detail').textContent, /Polymarket price/);
-});
-
-test('races watch.vote lacks are filled from AP, labeled, and never override its rows', async() => {
-  const empty = { ...payload('senate', 'Known leader'), rows:[
-    { raceId:'2026-ar-senate', result:null, official:{ authority:'Arkansas Secretary of State', url:'https://example.com/ar', read:false } },
-    ...payload('senate', 'Known leader').rows.filter(row => row.raceId === '2026-ga-senate')
-  ] };
-  const npr = () => response({ results:[
-    { test:false, state:'AR', office:'S', type:'General', eevp:0.678,
-      candidates:[{ id:1, first:'Cindy', last:'Hyde', party:'GOP', votes:321723 }, { id:2, first:'Scott', last:'Colom', party:'Dem', votes:307810 }, { id:3, last:'Other', party:'Other', votes:467 }] },
-    { test:false, state:'GA', office:'S', type:'General',
-      candidates:[{ id:5, first:'AP', last:'Override', party:'Dem', votes:999 }] }
-  ]});
-  const env = setup(() => response(empty), undefined, npr);
-  await env.flush();
-  assert.match(env.el('map-status').textContent, /2 races with results \(1 from AP via NPR where watch.vote has none\) · 0 called/);
-  const detail = env.el('map-detail').textContent;
-  assert.match(detail, /Leading: Cindy Hyde \(Republican\) · Not called/);
-  assert.match(detail, /Cindy Hyde · Republican · 51\.1%/);
-  assert.match(detail, /Scott Colom · Democratic · 48\.9%/);
-  assert.match(detail, /67\.8% of expected vote counted/);
-  assert.match(detail, /watch.vote has no result for this race yet/);
-  assert.match(detail, /AP via NPR/);
-  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /leading rep/);
-  assert.doesNotMatch(env.map.nodes.get('AR').path.getAttribute('class'), /disputed/);
-  env.el('map-race').value = 'ga-senate';
-  env.el('map-race').listeners.change();
-  await env.flush();
-  assert.match(env.el('map-detail').textContent, /Known leader/);
-  assert.doesNotMatch(env.el('map-detail').textContent, /watch.vote has no result/);
-});
-
-test('an AP call replaces an uncalled watch.vote row but never a watch.vote call', async() => {
-  const rows = payload('senate', 'Known leader').rows;
-  const calledGa = { ...rows.find(row => row.raceId === '2026-ga-senate') };
-  calledGa.result = { ...calledGa.result, call:'called', winner:'lead', winnerName:'Known leader', winnerParty:'Democratic' };
-  const data = { ...payload('senate', 'Known leader'), rows:[rows.find(row => row.raceId === '2026-ar-senate'), calledGa] };
-  const npr = () => response({ results:[
-    { test:false, state:'AR', office:'S', type:'General', eevp:0.9,
-      candidates:[{ id:1, first:'Known', last:'leader', party:'Dem', votes:900, winner:'X' }, { id:2, first:'Second', last:'candidate', party:'GOP', votes:600 }] },
-    { test:false, state:'GA', office:'S', type:'General',
-      candidates:[{ id:5, first:'Other', last:'Winner', party:'Dem', votes:9, winner:'X' }] }
-  ]});
-  const env = setup(() => response(data), undefined, npr);
-  await env.flush();
-  assert.match(env.el('map-status').textContent, /1 AP call watch.vote hasn’t made/);
-  assert.match(env.el('map-detail').textContent, /✓ Called: Known leader \(Democratic\)/);
-  assert.match(env.el('map-detail').textContent, /AP has called this race; watch.vote has not yet/);
-  assert.match(env.map.nodes.get('AR').path.getAttribute('class'), /called dem/);
-  env.el('map-race').value = 'ga-senate';
-  env.el('map-race').listeners.change();
-  await env.flush();
-  assert.match(env.el('map-detail').textContent, /✓ Called: Known leader/);
-  assert.doesNotMatch(env.el('map-detail').textContent, /AP has called this race/);
 });
