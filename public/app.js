@@ -21,6 +21,11 @@ let page = 0;
 let renderedIds = '';
 let searchTimer;
 let loading = false;
+let soundEnabled = false;
+let audioContext;
+const callTime = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short' });
+try { $('alerts-key').checked = localStorage.getItem('election-night-key-alerts') !== 'off'; } catch {}
+const callMonitor = new window.CallMonitor({ onChange:renderCalls, onAlert:announceCall });
 
 try {
   const saved = localStorage.getItem(storageKeys.home);
@@ -45,6 +50,75 @@ function element(tag, className, text) {
   return node;
 }
 
+function updateMonitoredRaces() {
+  callMonitor.setRaces(races.filter((race) => pins.has(race.id) || ($('alerts-key').checked && race.featured)));
+}
+
+function callText(event) {
+  if (!event.winner) return 'Call no longer reported';
+  const label = event.type === 'correction' ? 'Updated call' : event.callState === 'certified' ? 'Certified' : event.type === 'existing' ? 'Already called' : 'Called';
+  return `${label}: ${event.winner.name} (${event.winner.party})`;
+}
+
+function renderCalls(snapshot) {
+  const status = snapshot.paused ? 'Ⅱ Alerts paused' : document.hidden ? 'Ⅱ Checks paused in background'
+    : snapshot.backoffUntil > Date.now() ? '◌ Provider rate limit — checks will resume'
+    : `● Watching ${snapshot.total} races · ${snapshot.checkedCount} checked · ${snapshot.calls.length} called`;
+  $('calls-status').textContent = status + (snapshot.errorCount ? ` · ${snapshot.errorCount} unavailable or delayed` : '')
+    + (snapshot.lastCheckedAt ? ` · Last check ${callTime.format(new Date(snapshot.lastCheckedAt))}` : '');
+  $('alerts-pause').textContent = snapshot.paused ? 'Resume alerts' : 'Pause alerts';
+  $('alerts-pause').setAttribute('aria-pressed', String(snapshot.paused));
+  $('calls-coverage').hidden = !snapshot.unavailable?.length;
+  $('calls-unavailable').textContent = (snapshot.unavailable || []).join(' · ');
+  const seen = new Set();
+  const recent = snapshot.events.filter((event) => {
+    if (seen.has(event.raceId) || !races.some((race) => race.id === event.raceId)) return false;
+    seen.add(event.raceId);
+    return true;
+  }).slice(0, 12);
+  if (!recent.length) {
+    $('call-events').replaceChildren(element('p', 'call-empty', snapshot.total
+      ? 'No calls observed yet. A lead never triggers an alert.' : 'Save a race with ☆ or include national key races to watch for calls.'));
+    return;
+  }
+  $('call-events').replaceChildren(...recent.map((event) => {
+    const race = races.find((item) => item.id === event.raceId);
+    const card = element('article', `call-event${event.type === 'correction' ? ' call-correction' : ''}`);
+    const title = element('a', 'call-race', event.label);
+    title.href = `https://watch.vote/midterms/2026/races/${race.slug}`;
+    title.target = '_blank'; title.rel = 'noopener noreferrer';
+    const source = element('a', '', event.source.authority);
+    try {
+      const url = new URL(event.source.url);
+      source.href = ['https:', 'http:'].includes(url.protocol) ? url.href : title.href;
+    } catch { source.href = title.href; }
+    source.target = '_blank'; source.rel = 'noopener noreferrer';
+    const attribution = element('p', 'call-source', 'watch.vote · ');
+    attribution.append(source);
+    const timestamp = new Date(event.updatedAt);
+    const timing = `Detected ${callTime.format(new Date(event.detectedAt))}${Number.isFinite(timestamp.getTime()) ? ` · Source updated ${timestamp.toLocaleString()}` : ''}`;
+    card.append(title, element('strong', 'call-outcome', callText(event)), element('p', 'call-time', timing), attribution);
+    return card;
+  }));
+}
+
+function soundCall() {
+  if (!soundEnabled || audioContext?.state !== 'running') return;
+  const oscillator = audioContext.createOscillator();
+  const volume = audioContext.createGain();
+  oscillator.frequency.value = 660;
+  volume.gain.setValueAtTime(0.06, audioContext.currentTime);
+  volume.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
+  oscillator.connect(volume); volume.connect(audioContext.destination);
+  oscillator.start(); oscillator.stop(audioContext.currentTime + 0.25);
+}
+
+function announceCall(event) {
+  $('call-announcement').hidden = false;
+  $('call-announcement').textContent = `${event.type === 'correction' ? '↻' : '✓'} ${event.label} — ${callText(event)} · Detected ${callTime.format(new Date(event.detectedAt))}`;
+  soundCall();
+}
+
 function updateLocation() {
   $('home-state').value = homeState;
   $('home-focus').hidden = !homeState;
@@ -67,6 +141,7 @@ function raceCard(race) {
   pin.addEventListener('click', () => {
     pins.has(race.id) ? pins.delete(race.id) : pins.add(race.id);
     save(storageKeys.pins, JSON.stringify([...pins]));
+    updateMonitoredRaces();
     render();
     const replacement = [...$('race-grid').querySelectorAll('.pin-button')].find((node) => node.dataset.raceId === race.id);
     (replacement || $('view-pinned')).focus({ preventScroll: true });
@@ -157,6 +232,7 @@ async function loadDirectory() {
       || !Object.hasOwn(stateNames, row.state) || !offices.includes(row.office) || typeof row.name !== 'string')
       || new Set(rows.map((row) => row.id)).size !== rows.length) throw new Error('Invalid race directory');
     races = rows;
+    updateMonitoredRaces();
     $('directory-error').hidden = true;
     render();
   } catch {
@@ -202,5 +278,24 @@ $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchT
 $('page-prev').addEventListener('click', () => { page -= 1; render(); $('race-desk').scrollIntoView({ block:'start' }); });
 $('page-next').addEventListener('click', () => { page += 1; render(); $('race-desk').scrollIntoView({ block:'start' }); });
 $('retry').addEventListener('click', loadDirectory);
+$('alerts-key').addEventListener('change', () => {
+  save('election-night-key-alerts', $('alerts-key').checked ? 'on' : 'off');
+  updateMonitoredRaces();
+});
+$('alerts-pause').addEventListener('click', () => callMonitor.setPaused(!callMonitor.getSnapshot().paused));
+$('alerts-sound').addEventListener('click', async () => {
+  if (!soundEnabled) {
+    try {
+      audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+      await audioContext.resume();
+    } catch {
+      $('alerts-sound').textContent = 'Sound unavailable';
+      return;
+    }
+  }
+  soundEnabled = !soundEnabled;
+  $('alerts-sound').textContent = soundEnabled ? 'Sound on' : 'Enable sound';
+  $('alerts-sound').setAttribute('aria-pressed', String(soundEnabled));
+});
 updateLocation();
 loadDirectory();

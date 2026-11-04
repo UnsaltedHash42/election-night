@@ -1,13 +1,19 @@
 # Public edition
 
-Only `public/` goes to Cloudflare Pages. It contains a race directory and an interface for watch.vote's permitted embeds. It does not run the personal Python service, read its cache, copy NPR/AP results, calculate national control, or count flips. National control and party changes link to NPR/AP. The provider identifies the source, freshness and call status within each race card.
+Only `public/` goes to Cloudflare Pages. It contains a race directory, watch.vote's permitted embeds, and a browser call monitor using that provider's public widget JSON. It does not run the personal Python service, read its cache, copy NPR/AP results, calculate national control, or count flips. National control and party changes link to NPR/AP. The provider identifies the source, freshness and call status within each race card.
 
 Home state and watchlist choices stay in the visitor's browser. A shared `?state=AR` link sets an initial home state. No address or browser location permission is needed. Each page loads at most six race cards; their provider controls result updates.
+
+Call alerts check saved races and, by default, the 20 national featured races. Requests run one at a time, at least two seconds apart and no more often than every two minutes per race. Large watchlists take longer. Checks pause while the page is hidden or alerts are paused; responses completed while inactive leave the prior baseline for the next active check. A rate-limit response pauses the monitor for the provider's retry interval, or five minutes when that header is unavailable. Sound is opt-in. Calls and recent changes stay in each tab's session storage and survive reloads; separate tabs cannot overwrite each other's history. No notification subscription or server-side results cache is created.
+
+Only explicit `called` or `certified` states with exactly one winner qualify. New races establish a silent baseline. Later calls and changed or withdrawn call flags produce alerts; missing, malformed, delayed, stale or older responses preserve the last accepted state and show a warning. Detection time is local, not the provider's call time. API availability and called-result coverage vary; no actual positive provider call was available during initial implementation checks.
 
 ## Preview and check
 
 ```sh
 python3 -m unittest test_feeds.py test_public.py
+node --test test_call_alerts.cjs
+node test_public_ui.cjs
 node --check public/app.js
 npx wrangler@4.157.0 pages dev public --port 8788
 ```
@@ -36,6 +42,7 @@ The custom domain is registered with Pages. Its DNS record is `election CNAME el
 
 - [watch.vote publisher terms](https://watch.vote/docs/embeds/for-publishers) permit editorial/civic embeds with attribution intact.
 - [Race widget contract](https://watch.vote/docs/embeds/race) defines race slugs, source labels and result updates.
+- [Widget JSON API](https://watch.vote/docs/api-reference/widgets) permits publisher layouts and documents CORS, cache and rate limits; [OpenAPI](https://watch.vote/api/public/openapi.json) defines explicit call states and winner flags.
 - The directory has names of offices and seats, not candidates or results: [FEC 2026 election calendar](https://www.fec.gov/resources/cms-content/documents/2026pdates.pdf), [Census House apportionment](https://www2.census.gov/programs-surveys/decennial/2020/data/apportionment/apportionment-2020-table01.pdf), and [NGA governor elections](https://www.nga.org/governors/elections/).
 - The 507 directory entries comprise 435 House seats, 35 Senate races, 36 state governor races and the D.C. delegate. This is a directory, not a claim that every provider widget currently reports results. Territorial races other than D.C. are not included. Featured races are a browsing shortcut, not ratings or forecasts.
 - [Cloudflare Pages direct upload](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) describe deployment and DNS setup.

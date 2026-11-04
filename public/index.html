@@ -7,6 +7,7 @@
   <meta name="description" content="Follow national election coverage and build a personal watchlist of 2026 races with source-attributed results.">
   <title>Election Night · November 3, 2026</title>
   <link rel="stylesheet" href="/styles.css">
+  <script src="/call-alerts.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -29,6 +30,15 @@
           <article class="national-card"><span class="eyebrow amber">SEATS & GOVERNORSHIPS</span><h3>Which races change hands?</h3><p>Follow AP’s national coverage for called winners and party changes.</p><a class="source-button" href="https://apnews.com/projects/elections-2026/" target="_blank" rel="noopener noreferrer">Open AP election results <span aria-hidden="true">↗</span></a></article>
         </div>
         <p class="national-note">This page embeds individual race results; it does not calculate national control or a national flip tally. <a href="https://votes.decisiondeskhq.com/" target="_blank" rel="noopener noreferrer">Decision Desk HQ coverage ↗</a></p>
+      </section>
+      <section class="call-section" aria-labelledby="calls-title">
+        <div class="section-heading"><div><h2 id="calls-title">Call alerts</h2><p id="calls-status" role="status">Opening the call monitor…</p></div><div class="call-controls"><button id="alerts-pause" class="button" type="button" aria-pressed="false">Pause alerts</button><button id="alerts-sound" class="button" type="button" aria-pressed="false">Enable sound</button></div></div>
+        <label class="key-alert-option"><input id="alerts-key" type="checkbox" checked> Include national key races</label>
+        <p class="coverage-note">Saved races are always included. Keep this page open and visible; checks pause in the background. Races are checked about every two minutes; large watchlists take longer. Calls come from watch.vote's published results and may lag other outlets.</p>
+        <details id="calls-coverage" class="call-coverage" hidden><summary>Delayed or unavailable races</summary><p id="calls-unavailable"></p></details>
+        <p id="call-announcement" class="call-announcement" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        <div id="call-events" class="call-events"><p class="call-empty">No calls observed yet. A lead never triggers an alert.</p></div>
+        <p class="call-footnote">Times below say when this browser detected a change, not when the race was called. Each race's first check establishes a baseline without sounding an alert.</p>
       </section>
       <section class="location-settings" aria-label="Your location">
         <div class="location-controls"><label for="home-state">Home state</label><select id="home-state" aria-describedby="location-note"><option value="">National overview</option></select><button id="home-focus" class="button" type="button" hidden>Show home state</button></div>

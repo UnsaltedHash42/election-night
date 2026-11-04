@@ -25,17 +25,17 @@ class PublicEditionTests(unittest.TestCase):
         config = json.loads((ROOT / 'wrangler.jsonc').read_text())
         directory = (ROOT / config['pages_build_output_dir']).resolve()
         self.assertEqual(directory, ROOT / 'public')
-        allowed = {'index.html', 'app.js', 'styles.css', 'races.json', '_headers', '404.html'}
+        allowed = {'index.html', 'app.js', 'call-alerts.js', 'styles.css', 'races.json', '_headers', '404.html'}
         self.assertTrue({p.name for p in directory.iterdir()}.issubset(allowed))
         self.assertFalse(any(p.is_symlink() for p in directory.iterdir()))
 
     def test_public_page_has_no_personal_api_dependency(self):
-        source = (ROOT / 'public/app.js').read_text()
+        source = '\n'.join(path.read_text() for path in (ROOT / 'public').glob('*.js'))
         self.assertNotIn('/api/results', source)
         self.assertNotIn('127.0.0.1', source)
         self.assertNotIn('apps.npr.org/2026-election-results/data', source)
         self.assertIn('https://watch.vote', source)
-        self.assertFalse(re.search(r'fetch\([^\n]*https?://', source))
+        self.assertEqual(set(re.findall(r'https?://[^/\s\'"`]+', source)), {'https://watch.vote'})
 
 
 if __name__ == '__main__':
