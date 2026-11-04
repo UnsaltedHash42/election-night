@@ -10,7 +10,11 @@ test('key-market selection keeps the question, source link and read-only embed a
   const frames = [frame, { src:'house' }, { src:'senate' }];
   const elements = { 'market-race':choice, 'market-race-frame':frame, 'market-race-link':link,
     'markets-status':status, 'markets-refresh':{ addEventListener:(_, fn) => { handlers.refresh = fn; } } };
-  const context = { URLSearchParams, document:{ getElementById:id => elements[id], querySelectorAll:() => frames } };
+  const intervals = [];
+  const visibility = { state:'visible' };
+  const document = { getElementById:id => elements[id], querySelectorAll:() => frames };
+  Object.defineProperty(document, 'visibilityState', { get:() => visibility.state });
+  const context = { URLSearchParams, document, setInterval:(fn, ms) => intervals.push({ fn, ms }) };
   vm.runInNewContext(fs.readFileSync('public/markets.js', 'utf8'), context);
   choice.selectedOptions = [{ value:'will-the-democrats-win-the-maine-senate-race-in-2026', textContent:'Maine Senate', dataset:{ event:'maine-senate-election-winner' } }];
   handlers.change();
@@ -30,4 +34,12 @@ test('key-market selection keeps the question, source link and read-only embed a
   assert.equal(reloads, 3);
   assert.match(status.textContent, /Refresh requested/);
   assert.match(status.textContent, /not vote counts or race calls/);
+  assert.equal(intervals.length, 1);
+  assert.equal(intervals[0].ms, 300000);
+  visibility.state = 'hidden';
+  intervals[0].fn();
+  assert.equal(reloads, 3, 'hidden pages do not reload widgets');
+  visibility.state = 'visible';
+  intervals[0].fn();
+  assert.equal(reloads, 6);
 });

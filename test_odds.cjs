@@ -8,10 +8,11 @@ const event = (slug, markets, closed = false) => ({ slug, closed, markets:market
 })) });
 
 function setup({ map = {}, events = [], midpoints = {}, hidden = false } = {}) {
-  let serial = 0;
+  let serial = 0, now = Date.parse('2026-11-04T03:00:00Z');
   const timers = new Map(), requests = [], handlers = {};
   const document = { hidden, addEventListener:(name, callback) => { handlers[name] = callback; } };
   const context = { window:{}, document, JSON, Number, Map, Set, Object, Array, String, Math, AbortSignal:{ timeout:() => ({}) },
+    Date:class extends Date { static now() { return now; } },
     setTimeout:(callback, delay) => { const id = ++serial; timers.set(id, { callback, delay }); return id; },
     clearTimeout:id => timers.delete(id), encodeURIComponent,
     fetch:async (url, options = {}) => {
@@ -31,7 +32,7 @@ function setup({ map = {}, events = [], midpoints = {}, hidden = false } = {}) {
   vm.runInContext(fs.readFileSync('public/odds.js', 'utf8'), context);
   const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
   return { odds:context.window.raceOdds, oddsText:context.oddsText, requests, timers, handlers, document, flush, midpoints,
-    tick:async () => { for (const [id, timer] of [...timers]) { timers.delete(id); timer.callback(); } await flush(); } };
+    tick:async () => { for (const [id, timer] of [...timers]) { timers.delete(id); now += timer.delay; timer.callback(); } await flush(); } };
 }
 
 test('watched races get live prices, ordered by price, in one batched request', async () => {
@@ -58,15 +59,28 @@ test('watched races get live prices, ordered by price, in one batched request', 
   assert.deepEqual(JSON.parse(clob[0].body).map(item => item.token_id).sort(), ['b', 'c', 'g', 'h']);
 });
 
-test('each minute refreshes prices only; event details are fetched once', async () => {
-  const env = setup({ map:{ 'oh-senate':'ohio' }, events:[event('ohio', [['Brown (D)', 'b', 0.5], ['Husted (R)', 'h', 0.5]])], midpoints:{ b:'0.55', h:'0.45' } });
+test('prices refresh every minute; market details and settlement every five minutes', async () => {
+  const events = [event('ohio', [['Brown (D)', 'b', 0.5], ['Husted (R)', 'h', 0.5]])];
+  const env = setup({ map:{ 'oh-senate':'ohio' }, events, midpoints:{ b:'0.55', h:'0.45' } });
   env.odds.watch('desk', ['oh-senate']);
   await env.flush();
   env.midpoints.b = '0.70'; env.midpoints.h = '0.30';
   await env.tick();
   assert.equal(env.odds.get('oh-senate').markets[0].price, 0.7);
-  assert.equal(env.requests.filter(request => request.url.includes('gamma-api')).length, 1);
-  assert.equal(env.requests.filter(request => request.url.includes('clob')).length, 2);
+  const gamma = () => env.requests.filter(request => request.url.includes('gamma-api')).length;
+  const clob = () => env.requests.filter(request => request.url.includes('clob')).length;
+  assert.equal(gamma(), 1);
+  assert.equal(clob(), 2);
+  events[0] = event('ohio', [['Brown (D)', 'b', 1], ['Husted (R)', 'h', 0]], true);
+  for (let minute = 2; minute < 5; minute++) await env.tick();
+  assert.equal(gamma(), 1, 'details are reused for under five minutes');
+  assert.equal(env.oddsText(env.odds.get('oh-senate')).startsWith('Polymarket: Brown (D)'), true);
+  await env.tick();
+  assert.equal(gamma(), 2, 'details are refetched at five minutes');
+  assert.equal(env.oddsText(env.odds.get('oh-senate')), 'Polymarket (resolved): Brown (D)');
+  const polled = clob();
+  await env.tick();
+  assert.equal(clob(), polled, 'a settled market is no longer polled');
 });
 
 test('resolved markets show the result, unmapped races say so, and failures keep prices', async () => {

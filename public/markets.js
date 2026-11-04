@@ -11,7 +11,13 @@ marketRace.addEventListener('change', () => {
   link.href = `https://polymarket.com/event/${option.dataset.event}`;
   link.textContent = `Open ${option.textContent} market ↗`;
 });
+const reloadMarkets = () => {
+  for (const frame of document.querySelectorAll('.market-grid iframe')) frame.src = frame.src;
+};
 document.getElementById('markets-refresh').addEventListener('click', () => {
-  for (const frame of document.querySelectorAll('.market-card iframe')) frame.src = frame.src;
+  reloadMarkets();
   document.getElementById('markets-status').textContent = 'Refresh requested. Polymarket supplies these odds; they are not vote counts or race calls. Each question defines Yes and No.';
 });
+setInterval(() => {
+  if (document.visibilityState === 'visible') reloadMarkets();
+}, 300000);

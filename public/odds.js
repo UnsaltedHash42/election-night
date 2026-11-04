@@ -35,11 +35,11 @@ window.raceOdds = (() => {
     try {
       const map = await loadSlugs();
       const wanted = [...new Set([...watched.values()].flatMap(ids => [...ids]).map(id => map[id]).filter(Boolean))];
-      const unknown = wanted.filter(slug => !events.has(slug));
+      const unknown = wanted.filter(slug => !events.has(slug) || Date.now() - events.get(slug).fetchedAt >= 300000);
       if (unknown.length) {
         const query = unknown.map(slug => `slug=${encodeURIComponent(slug)}`).join('&');
         const response = await fetch(`https://gamma-api.polymarket.com/events?${query}`, { signal:AbortSignal.timeout(15000) });
-        if (response.ok) for (const event of await response.json()) if (unknown.includes(event?.slug)) events.set(event.slug, parseOddsEvent(event));
+        if (response.ok) for (const event of await response.json()) if (unknown.includes(event?.slug)) events.set(event.slug, { ...parseOddsEvent(event), fetchedAt:Date.now() });
       }
       const tokens = wanted.flatMap(slug => events.get(slug)?.closed === false ? events.get(slug).markets.map(market => market.token) : []).filter(Boolean);
       if (tokens.length) {
